@@ -98,6 +98,14 @@ describe("call reducer", () => {
     expect(s.pushToTalk).toBe(true);
   });
 
+  it("barge-in is on by default and can be toggled off", () => {
+    expect(initialState.bargeIn).toBe(true);
+    let s = reducer(initialState, { type: "set_barge_in", value: false });
+    expect(s.bargeIn).toBe(false);
+    s = reducer(s, { type: "set_barge_in", value: true });
+    expect(s.bargeIn).toBe(true);
+  });
+
   it("sets a note and clears it on the next agent turn", () => {
     let s = reducer(initialState, { type: "note", text: "Microphone unavailable" });
     expect(s.note).toBe("Microphone unavailable");

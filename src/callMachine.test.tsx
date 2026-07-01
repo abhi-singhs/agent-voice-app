@@ -3,7 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { VoiceRequest } from "./ipc";
-import type { ListenHandle, ListenResult } from "./audio/listen";
+import type { ListenHandle, ListenOptions, ListenResult } from "./audio/listen";
 
 const respondCall = vi.fn();
 const respondListen = vi.fn();
@@ -31,20 +31,41 @@ vi.mock("./ipc", () => ({
 vi.mock("./notify", () => ({ notifyIncomingCall: vi.fn(() => Promise.resolve()) }));
 
 // Audio side-effects: playback resolves (or stays pending); listen is scriptable.
+// `stopPlayback` resolves any pending playback promise, mirroring the real player
+// (onended/onpause fire on stop), so interrupt/barge flows can be exercised.
 const playTts = vi.fn(() => Promise.resolve());
+let resolvePlayback: (() => void) | null = null;
+const stopPlayback = vi.fn(() => {
+  const r = resolvePlayback;
+  resolvePlayback = null;
+  r?.();
+});
 vi.mock("./audio/player", () => ({
   playTts: (...a: unknown[]) => playTts(...(a as [])),
-  stopPlayback: vi.fn(),
+  stopPlayback: (...a: unknown[]) => stopPlayback(...(a as [])),
 }));
+
+/** A playback promise that only resolves when stopPlayback() is called. */
+function playbackUntilStopped(): Promise<void> {
+  return new Promise<void>((r) => {
+    resolvePlayback = r;
+  });
+}
 
 const listenFinish = vi.fn();
 const listenCancel = vi.fn();
+const listenBeginCapture = vi.fn();
 let nextListenResult: Promise<ListenResult> = new Promise<ListenResult>(() => {});
 const startListening = vi.fn(
-  (): ListenHandle => ({ result: nextListenResult, finish: listenFinish, cancel: listenCancel }),
+  (_opts?: ListenOptions): ListenHandle => ({
+    result: nextListenResult,
+    finish: listenFinish,
+    cancel: listenCancel,
+    beginCapture: listenBeginCapture,
+  }),
 );
 vi.mock("./audio/listen", () => ({
-  startListening: (...a: unknown[]) => startListening(...(a as [])),
+  startListening: (...a: unknown[]) => startListening(...(a as [ListenOptions?])),
 }));
 
 import { useCallMachine } from "./callMachine";
@@ -78,6 +99,7 @@ async function connect(id = 1) {
 beforeEach(() => {
   vi.clearAllMocks();
   requestHandler = null;
+  resolvePlayback = null;
   playTts.mockReturnValue(Promise.resolve());
   tts.mockReturnValue(Promise.resolve(new ArrayBuffer(8)));
   stt.mockReturnValue(Promise.resolve("hello there"));
@@ -229,5 +251,109 @@ describe("useCallMachine", () => {
     };
     expect(record.entries).toEqual([{ who: "agent", text: "Hello there" }]);
     expect(record.outcome).toMatch(/ended/i);
+  });
+
+  describe("barge-in / interruption", () => {
+    it("opens the mic in barge mode during say_and_listen speech", async () => {
+      playTts.mockImplementationOnce(playbackUntilStopped);
+      const { result } = await connect(1);
+      emit({ kind: "say_and_listen", id: 2, text: "Long answer…", listen: true, listen_timeout_sec: null });
+      await flush();
+
+      expect(result.current.state.phase).toBe("speaking");
+      expect(startListening).toHaveBeenCalledTimes(1);
+      expect(startListening.mock.calls[0][0]).toMatchObject({ barge: true });
+    });
+
+    it("manual interrupt cuts off TTS and hands the turn to the user", async () => {
+      playTts.mockImplementationOnce(playbackUntilStopped);
+      const { result } = await connect(1);
+      emit({ kind: "say_and_listen", id: 2, text: "Long answer…", listen: true, listen_timeout_sec: null });
+      await flush();
+      expect(result.current.state.phase).toBe("speaking");
+
+      act(() => result.current.interrupt());
+      await flush();
+
+      expect(stopPlayback).toHaveBeenCalled();
+      expect(result.current.state.phase).toBe("listening");
+      // Promotes the already-open barge listen rather than opening a new one.
+      expect(listenBeginCapture).toHaveBeenCalled();
+      expect(startListening).toHaveBeenCalledTimes(1);
+    });
+
+    it("hands-free barge-in cuts off TTS when the user starts talking", async () => {
+      playTts.mockImplementationOnce(playbackUntilStopped);
+      const { result } = await connect(1);
+      emit({ kind: "say_and_listen", id: 2, text: "Rambling…", listen: true, listen_timeout_sec: null });
+      await flush();
+      const opts = startListening.mock.calls[0][0] as ListenOptions;
+      expect(opts.barge).toBe(true);
+
+      // Simulate the VAD detecting the user's speech onset.
+      act(() => opts.onBarge?.());
+      await flush();
+
+      expect(stopPlayback).toHaveBeenCalled();
+      expect(result.current.state.phase).toBe("listening");
+    });
+
+    it("interrupting a one-way announcement silences it and acks", async () => {
+      playTts.mockImplementationOnce(playbackUntilStopped);
+      const { result } = await connect(1);
+      emit({ kind: "say", id: 2, text: "Long announcement…" });
+      await flush();
+      expect(result.current.state.phase).toBe("speaking");
+      // No mic is opened for a one-way announcement.
+      expect(startListening).not.toHaveBeenCalled();
+
+      act(() => result.current.interrupt());
+      await flush();
+
+      expect(stopPlayback).toHaveBeenCalled();
+      expect(respondAck).toHaveBeenCalledWith(2, "ok");
+      expect(result.current.state.phase).toBe("connected");
+    });
+
+    it("does not open the mic during speech when barge-in is off", async () => {
+      playTts.mockImplementationOnce(playbackUntilStopped);
+      const { result } = await connect(1);
+      act(() => result.current.setBargeIn(false));
+      emit({ kind: "say_and_listen", id: 2, text: "Hello?", listen: true, listen_timeout_sec: null });
+      await flush();
+
+      expect(result.current.state.phase).toBe("speaking");
+      expect(startListening).not.toHaveBeenCalled();
+
+      // When TTS finishes, a normal (non-barge) listen opens.
+      act(() => resolvePlayback?.());
+      await flush();
+      expect(startListening).toHaveBeenCalledTimes(1);
+      expect(startListening.mock.calls[0][0]).not.toMatchObject({ barge: true });
+      expect(result.current.state.phase).toBe("listening");
+    });
+
+    it("does not open the mic during speech when muted", async () => {
+      playTts.mockImplementationOnce(playbackUntilStopped);
+      const { result } = await connect(1);
+      act(() => result.current.toggleMute());
+      emit({ kind: "say_and_listen", id: 2, text: "Hi?", listen: true, listen_timeout_sec: null });
+      await flush();
+      expect(result.current.state.phase).toBe("speaking");
+      expect(startListening).not.toHaveBeenCalled();
+
+      // Muted: finishing TTS goes to listening without opening the mic (user types).
+      act(() => resolvePlayback?.());
+      await flush();
+      expect(startListening).not.toHaveBeenCalled();
+      expect(result.current.state.phase).toBe("listening");
+    });
+
+    it("ignores interrupt() outside the speaking phase", async () => {
+      const { result } = await connect(1);
+      expect(result.current.state.phase).toBe("connected");
+      act(() => result.current.interrupt());
+      expect(stopPlayback).not.toHaveBeenCalled();
+    });
   });
 });

@@ -33,6 +33,8 @@ export interface CallController {
   sendReply: (text: string) => void;
   toggleMute: () => void;
   setPushToTalk: (value: boolean) => void;
+  setBargeIn: (value: boolean) => void;
+  interrupt: () => void;
   startTalking: () => void;
   stopTalking: () => void;
 }
@@ -45,9 +47,15 @@ export function useCallMachine(): CallController {
   const phaseRef = useRef<Phase>("idle");
   const mutedRef = useRef(false);
   const pttRef = useRef(false);
+  const bargeInRef = useRef(true);
   const endTimer = useRef<number | null>(null);
   // The active listen turn (mic capture), if any.
   const listenRef = useRef<ListenHandle | null>(null);
+  // True while TTS is actively playing. Updated *synchronously* (unlike phaseRef,
+  // which is mirrored from state via an effect and therefore lags a dispatch), so
+  // the barge-drop guard in consumeListen can reliably tell whether a listen
+  // resolved during the agent's speech.
+  const ttsActiveRef = useRef(false);
   // Epoch ms when the current call was answered (for history).
   const callStartRef = useRef<number | null>(null);
 
@@ -56,7 +64,8 @@ export function useCallMachine(): CallController {
     phaseRef.current = state.phase;
     mutedRef.current = state.muted;
     pttRef.current = state.pushToTalk;
-  }, [state.pending, state.phase, state.muted, state.pushToTalk]);
+    bargeInRef.current = state.bargeIn;
+  }, [state.pending, state.phase, state.muted, state.pushToTalk, state.bargeIn]);
 
   // Auto-return to idle a few seconds after a call ends, and persist the
   // transcript to history (best-effort) once per ended call.
@@ -83,6 +92,7 @@ export function useCallMachine(): CallController {
   // failure is non-fatal — captions still show — but we surface a note so the
   // user knows to rely on text.
   const speak = useCallback(async (text: string): Promise<boolean> => {
+    ttsActiveRef.current = true;
     try {
       const bytes = await tts(text);
       await playTts(bytes);
@@ -91,6 +101,8 @@ export function useCallMachine(): CallController {
       console.error("TTS failed:", err);
       dispatch({ type: "note", text: "Couldn’t play audio — check ElevenLabs setup." });
       return false;
+    } finally {
+      ttsActiveRef.current = false;
     }
   }, []);
 
@@ -100,6 +112,11 @@ export function useCallMachine(): CallController {
     if (listenRef.current === handle) listenRef.current = null;
     // Someone else already resolved this request (hang-up / typed reply).
     if (res.status === "aborted") return;
+    // A barge listen that ends *without a transcript* while the agent is still
+    // speaking means the user never engaged (e.g. the mic failed to open before
+    // barge-in). Drop it silently so the post-TTS path starts a proper listen
+    // (which surfaces any mic error then). A real "ok" is always delivered.
+    if (res.status !== "ok" && ttsActiveRef.current) return;
     const p = pendingRef.current;
     if (!(p?.kind === "listen" && p.id === id)) return;
 
@@ -142,6 +159,25 @@ export function useCallMachine(): CallController {
     [consumeListen],
   );
 
+  // Open the mic *during* the agent's speech so the user can barge in. Watches
+  // only for speech onset; when the user starts talking it cuts off TTS and
+  // promotes to a normal capture turn.
+  const beginBargeListen = useCallback(
+    (id: number, timeoutSec: number | null) => {
+      const handle = startListening({
+        barge: true,
+        startTimeoutMs: timeoutSec ? timeoutSec * 1000 : undefined,
+        onBarge: () => {
+          stopPlayback();
+          dispatch({ type: "speaking_done" });
+        },
+      });
+      listenRef.current = handle;
+      void consumeListen(id, handle);
+    },
+    [consumeListen],
+  );
+
   const handleRequest = useCallback(
     (req: VoiceRequest) => {
       switch (req.kind) {
@@ -175,6 +211,11 @@ export function useCallMachine(): CallController {
             ? { kind: "listen", id: req.id }
             : { kind: "ack", id: req.id };
           dispatch({ type: "agent_say", text: req.text, pending });
+          // Open the mic during playback so the user can barge in, unless barge-in
+          // is off, muted, or in push-to-talk (which capture only on demand).
+          if (req.listen && bargeInRef.current && !mutedRef.current && !pttRef.current) {
+            beginBargeListen(req.id, req.listen_timeout_sec);
+          }
           void speak(req.text).then(() => {
             // Bail out if the call ended (or moved on) while speaking.
             const p = pendingRef.current;
@@ -184,9 +225,18 @@ export function useCallMachine(): CallController {
               dispatch({ type: "return_to_connected" });
               return;
             }
-            dispatch({ type: "speaking_done" }); // -> listening
-            // Hands-free capture unless muted or in push-to-talk mode.
-            if (!mutedRef.current && !pttRef.current) {
+            // -> listening (idempotent if a barge-in already transitioned us).
+            if (phaseRef.current === "speaking") dispatch({ type: "speaking_done" });
+            if (mutedRef.current || pttRef.current) {
+              // The user will type or use push-to-talk; drop any armed capture.
+              listenRef.current?.cancel();
+              listenRef.current = null;
+              return;
+            }
+            if (listenRef.current) {
+              // A concurrent barge listen is open — promote it to a real capture.
+              listenRef.current.beginCapture();
+            } else {
               beginListen(req.id, req.listen_timeout_sec, false);
             }
           });
@@ -203,7 +253,7 @@ export function useCallMachine(): CallController {
         }
       }
     },
-    [speak, beginListen],
+    [speak, beginListen, beginBargeListen],
   );
 
   useEffect(() => {
@@ -278,6 +328,24 @@ export function useCallMachine(): CallController {
     }
   }, []);
 
+  const setBargeIn = useCallback((value: boolean) => {
+    dispatch({ type: "set_barge_in", value });
+    // Turning barge-in off while the agent is speaking closes the armed mic; a
+    // fresh listen opens once the agent finishes.
+    if (!value && phaseRef.current === "speaking" && listenRef.current) {
+      listenRef.current.cancel();
+      listenRef.current = null;
+    }
+  }, []);
+
+  // Cut the agent off mid-sentence. Stopping playback resolves the speak()
+  // promise, whose continuation hands the turn to the user (say_and_listen) or
+  // acks a one-way announcement.
+  const interrupt = useCallback(() => {
+    if (phaseRef.current !== "speaking") return;
+    stopPlayback();
+  }, []);
+
   const startTalking = useCallback(() => {
     const p = pendingRef.current;
     if (phaseRef.current !== "listening" || p?.kind !== "listen") return;
@@ -298,9 +366,23 @@ export function useCallMachine(): CallController {
       sendReply,
       toggleMute,
       setPushToTalk,
+      setBargeIn,
+      interrupt,
       startTalking,
       stopTalking,
     }),
-    [state, answer, decline, hangUp, sendReply, toggleMute, setPushToTalk, startTalking, stopTalking],
+    [
+      state,
+      answer,
+      decline,
+      hangUp,
+      sendReply,
+      toggleMute,
+      setPushToTalk,
+      setBargeIn,
+      interrupt,
+      startTalking,
+      stopTalking,
+    ],
   );
 }
