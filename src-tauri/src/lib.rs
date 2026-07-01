@@ -84,6 +84,7 @@ pub fn run() {
             commands::save_voice_config,
             commands::tts,
             commands::stt,
+            commands::mcp_clients,
             commands::mcp_status,
             commands::register_mcp,
             commands::unregister_mcp,
