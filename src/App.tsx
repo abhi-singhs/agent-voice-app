@@ -5,8 +5,17 @@ import { RingScreen } from "./components/RingScreen";
 import "./App.css";
 
 function App() {
-  const { state, answer, decline, hangUp, sendReply, toggleMute, setPushToTalk } =
-    useCallMachine();
+  const {
+    state,
+    answer,
+    decline,
+    hangUp,
+    sendReply,
+    toggleMute,
+    setPushToTalk,
+    startTalking,
+    stopTalking,
+  } = useCallMachine();
 
   return (
     <main className="app">
@@ -25,6 +34,8 @@ function App() {
           onSendReply={sendReply}
           onToggleMute={toggleMute}
           onSetPushToTalk={setPushToTalk}
+          onStartTalking={startTalking}
+          onStopTalking={stopTalking}
           onHangUp={hangUp}
         />
       )}

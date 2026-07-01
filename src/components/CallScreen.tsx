@@ -9,6 +9,8 @@ interface Props {
   onSendReply: (text: string) => void;
   onToggleMute: () => void;
   onSetPushToTalk: (value: boolean) => void;
+  onStartTalking: () => void;
+  onStopTalking: () => void;
   onHangUp: () => void;
 }
 
@@ -30,11 +32,14 @@ export function CallScreen({
   onSendReply,
   onToggleMute,
   onSetPushToTalk,
+  onStartTalking,
+  onStopTalking,
   onHangUp,
 }: Props) {
   const [draft, setDraft] = useState("");
   const listening = state.phase === "listening";
   const ended = state.phase === "ended";
+  const showPushToTalk = listening && state.pushToTalk && !state.muted;
 
   const submit = () => {
     if (!draft.trim()) return;
@@ -56,6 +61,18 @@ export function CallScreen({
       )}
 
       <Transcript lines={state.transcript} />
+
+      {showPushToTalk && (
+        <button
+          type="button"
+          className="ptt"
+          onPointerDown={onStartTalking}
+          onPointerUp={onStopTalking}
+          onPointerLeave={onStopTalking}
+        >
+          🎙️ Hold to talk
+        </button>
+      )}
 
       {!ended && (
         <div className={`reply ${listening ? "reply--active" : ""}`}>

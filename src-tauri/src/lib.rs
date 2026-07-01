@@ -1,12 +1,15 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 mod commands;
+pub mod config;
+pub mod elevenlabs;
 mod runtime;
 mod session;
 mod ws_server;
 
 use std::sync::Arc;
 
+use reqwest::Client;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Manager, WindowEvent};
@@ -36,6 +39,8 @@ pub fn run() {
         .setup(|app| {
             let state = Arc::new(SessionManager::new());
             app.manage(state.clone());
+            // Shared HTTP client for ElevenLabs (connection reuse).
+            app.manage(Client::new());
 
             let handle = app.handle().clone();
             match ws_server::start(handle, state.clone()) {
@@ -71,7 +76,10 @@ pub fn run() {
             commands::respond_call,
             commands::respond_listen,
             commands::respond_ack,
-            commands::notify_hangup
+            commands::notify_hangup,
+            commands::voice_config,
+            commands::tts,
+            commands::stt
         ])
         .build(context)
         .expect("error while building tauri application")

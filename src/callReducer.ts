@@ -60,6 +60,7 @@ export type Action =
   | { type: "speaking_done" }
   | { type: "user_reply"; text: string }
   | { type: "clear_pending" }
+  | { type: "return_to_connected" }
   | { type: "ended"; reason: string; farewell: string | null }
   | { type: "toggle_mute" }
   | { type: "set_ptt"; value: boolean }
@@ -107,6 +108,11 @@ export function reducer(state: CallState, action: Action): CallState {
 
     case "clear_pending":
       return { ...state, pending: null };
+
+    case "return_to_connected":
+      // Listen finished with nothing to add (no speech / error); go back to
+      // the connected state without appending a transcript line.
+      return { ...state, phase: "connected", pending: null, caption: null };
 
     case "ended": {
       const transcript = action.farewell

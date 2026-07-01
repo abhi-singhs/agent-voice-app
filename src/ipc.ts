@@ -58,3 +58,27 @@ export function respondAck(id: number, status: AckStatus): Promise<void> {
 export function notifyHangup(): Promise<void> {
   return invoke("notify_hangup");
 }
+
+/** Non-secret ElevenLabs config, mirrors the Rust `VoiceConfigInfo`. */
+export interface VoiceConfigInfo {
+  voice_id: string;
+  voice_name: string | null;
+  model_id: string;
+  enabled: boolean;
+  configured: boolean;
+}
+
+/** Fetch the current ElevenLabs voice config (throws if not configured). */
+export function voiceConfig(): Promise<VoiceConfigInfo> {
+  return invoke("voice_config");
+}
+
+/** Synthesize `text` to speech; resolves with mp3 bytes. */
+export async function tts(text: string): Promise<ArrayBuffer> {
+  return invoke<ArrayBuffer>("tts", { text });
+}
+
+/** Transcribe base64-encoded audio; resolves with the recognized text. */
+export function stt(audio: string, mime: string, filename: string): Promise<string> {
+  return invoke("stt", { audio, mime, filename });
+}

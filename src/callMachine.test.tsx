@@ -3,11 +3,14 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { VoiceRequest } from "./ipc";
+import type { ListenHandle, ListenResult } from "./audio/listen";
 
 const respondCall = vi.fn();
 const respondListen = vi.fn();
 const respondAck = vi.fn();
 const notifyHangup = vi.fn();
+const tts = vi.fn(() => Promise.resolve(new ArrayBuffer(8)));
+const stt = vi.fn(() => Promise.resolve("hello there"));
 let requestHandler: ((req: VoiceRequest) => void) | null = null;
 
 vi.mock("./ipc", () => ({
@@ -19,15 +22,33 @@ vi.mock("./ipc", () => ({
   respondListen: (...a: unknown[]) => respondListen(...a),
   respondAck: (...a: unknown[]) => respondAck(...a),
   notifyHangup: (...a: unknown[]) => notifyHangup(...a),
+  tts: (...a: unknown[]) => tts(...(a as [])),
+  stt: (...a: unknown[]) => stt(...(a as [])),
 }));
 
 vi.mock("./notify", () => ({ notifyIncomingCall: vi.fn(() => Promise.resolve()) }));
+
+// Audio side-effects: playback resolves (or stays pending); listen is scriptable.
+const playTts = vi.fn(() => Promise.resolve());
+vi.mock("./audio/player", () => ({
+  playTts: (...a: unknown[]) => playTts(...(a as [])),
+  stopPlayback: vi.fn(),
+}));
+
+const listenFinish = vi.fn();
+const listenCancel = vi.fn();
+let nextListenResult: Promise<ListenResult> = new Promise<ListenResult>(() => {});
+const startListening = vi.fn(
+  (): ListenHandle => ({ result: nextListenResult, finish: listenFinish, cancel: listenCancel }),
+);
+vi.mock("./audio/listen", () => ({
+  startListening: (...a: unknown[]) => startListening(...(a as [])),
+}));
 
 import { useCallMachine } from "./callMachine";
 
 async function mountAndRegister() {
   const hook = renderHook(() => useCallMachine());
-  // Let the subscription effect register the request handler.
   await act(async () => {});
   return hook;
 }
@@ -36,9 +57,29 @@ function emit(req: VoiceRequest) {
   act(() => requestHandler?.(req));
 }
 
+async function flush() {
+  for (let i = 0; i < 12; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+}
+
+async function connect(id = 1) {
+  const hook = await mountAndRegister();
+  emit({ kind: "incoming_call", id, reason: null, timeout_sec: null });
+  act(() => hook.result.current.answer());
+  return hook;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   requestHandler = null;
+  playTts.mockReturnValue(Promise.resolve());
+  tts.mockReturnValue(Promise.resolve(new ArrayBuffer(8)));
+  stt.mockReturnValue(Promise.resolve("hello there"));
+  nextListenResult = new Promise<ListenResult>(() => {});
 });
 
 describe("useCallMachine", () => {
@@ -67,30 +108,73 @@ describe("useCallMachine", () => {
   });
 
   it("declines a second concurrent call while in one", async () => {
-    const { result } = await mountAndRegister();
-    emit({ kind: "incoming_call", id: 1, reason: null, timeout_sec: null });
-    act(() => result.current.answer());
+    const { result } = await connect(1);
     respondCall.mockClear();
     emit({ kind: "incoming_call", id: 2, reason: null, timeout_sec: null });
     expect(respondCall).toHaveBeenCalledWith(2, "declined");
-    // Still in the first call.
     expect(result.current.state.phase).toBe("connected");
   });
 
-  it("say_and_listen enters speaking with a listen pending", async () => {
-    const { result } = await mountAndRegister();
-    emit({ kind: "incoming_call", id: 1, reason: null, timeout_sec: null });
-    act(() => result.current.answer());
+  it("say_and_listen enters speaking while TTS is playing", async () => {
+    // Keep playback pending so we can observe the speaking phase.
+    playTts.mockReturnValue(new Promise<void>(() => {}));
+    const { result } = await connect(1);
     emit({ kind: "say_and_listen", id: 2, text: "How are you?", listen: true, listen_timeout_sec: null });
     expect(result.current.state.phase).toBe("speaking");
     expect(result.current.state.caption).toBe("How are you?");
     expect(respondListen).not.toHaveBeenCalled();
   });
 
+  it("completes a spoken reply end-to-end (TTS → listen → STT)", async () => {
+    nextListenResult = Promise.resolve({ status: "ok", wavBase64: "AAAA", durationMs: 800 });
+    const { result } = await connect(1);
+    emit({ kind: "say_and_listen", id: 2, text: "Hello?", listen: true, listen_timeout_sec: 15 });
+    await flush();
+
+    expect(tts).toHaveBeenCalledWith("Hello?");
+    expect(startListening).toHaveBeenCalled();
+    expect(stt).toHaveBeenCalledWith("AAAA", "audio/wav", "reply.wav");
+    expect(respondListen).toHaveBeenCalledWith(2, "hello there", "ok");
+    expect(result.current.state.phase).toBe("connected");
+    expect(result.current.state.transcript.at(-1)).toMatchObject({ who: "you", text: "hello there" });
+  });
+
+  it("reports no_speech when the listen turn hears nothing", async () => {
+    nextListenResult = Promise.resolve({ status: "no_speech" });
+    const { result } = await connect(1);
+    emit({ kind: "say_and_listen", id: 2, text: "Hi?", listen: true, listen_timeout_sec: null });
+    await flush();
+
+    expect(stt).not.toHaveBeenCalled();
+    expect(respondListen).toHaveBeenCalledWith(2, null, "no_speech");
+    expect(result.current.state.phase).toBe("connected");
+  });
+
+  it("voice_say speaks then acks and returns to connected", async () => {
+    const { result } = await connect(1);
+    emit({ kind: "say", id: 2, text: "Heads up!" });
+    await flush();
+    expect(tts).toHaveBeenCalledWith("Heads up!");
+    expect(respondAck).toHaveBeenCalledWith(2, "ok");
+    expect(result.current.state.phase).toBe("connected");
+  });
+
+  it("a typed reply cancels the mic capture and answers the agent", async () => {
+    // Listen never resolves on its own; the typed reply should drive it.
+    const { result } = await connect(1);
+    emit({ kind: "say_and_listen", id: 2, text: "Name?", listen: true, listen_timeout_sec: null });
+    await flush();
+    expect(startListening).toHaveBeenCalled();
+
+    act(() => result.current.sendReply("Ada"));
+    expect(listenCancel).toHaveBeenCalled();
+    expect(respondListen).toHaveBeenCalledWith(2, "Ada", "ok");
+    expect(result.current.state.transcript.at(-1)).toMatchObject({ who: "you", text: "Ada" });
+  });
+
   it("hang up during a listen resolves the pending request with call_ended", async () => {
-    const { result } = await mountAndRegister();
-    emit({ kind: "incoming_call", id: 1, reason: null, timeout_sec: null });
-    act(() => result.current.answer());
+    playTts.mockReturnValue(new Promise<void>(() => {}));
+    const { result } = await connect(1);
     emit({ kind: "say_and_listen", id: 2, text: "Hi", listen: true, listen_timeout_sec: null });
 
     act(() => result.current.hangUp());
@@ -100,9 +184,7 @@ describe("useCallMachine", () => {
   });
 
   it("agent hangup acks and ends the call", async () => {
-    const { result } = await mountAndRegister();
-    emit({ kind: "incoming_call", id: 1, reason: null, timeout_sec: null });
-    act(() => result.current.answer());
+    const { result } = await connect(1);
     emit({ kind: "hangup", id: 3, farewell: "Bye!" });
     expect(respondAck).toHaveBeenCalledWith(3, "ok");
     expect(result.current.state.phase).toBe("ended");
