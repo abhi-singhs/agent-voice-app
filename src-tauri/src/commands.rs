@@ -13,7 +13,7 @@ use voice_protocol::{AckStatus, CallStatus, ListenStatus, ServerMessage};
 use crate::config::{ElevenLabsConfig, VoiceConfigInfo};
 use crate::elevenlabs;
 use crate::history::{self, CallRecord};
-use crate::mcp_register::{self, McpStatus};
+use crate::mcp_register::{self, McpClientInfo, McpStatus};
 use crate::session::{FrontendResponse, SessionManager};
 
 /// Reply to an `IncomingCall` request (answered / declined / timeout).
@@ -148,22 +148,28 @@ pub async fn stt(
     Ok(text)
 }
 
-/// Report whether the MCP server is registered with the Copilot CLI.
+/// List clients that can receive the bundled MCP server config.
 #[tauri::command]
-pub fn mcp_status() -> Result<McpStatus, String> {
-    mcp_register::status().map_err(|e| e.to_string())
+pub fn mcp_clients() -> Result<Vec<McpClientInfo>, String> {
+    mcp_register::clients().map_err(|e| e.to_string())
 }
 
-/// Register (or update) the MCP server in `~/.copilot/mcp-config.json`.
+/// Report whether the MCP server is registered with the selected client.
 #[tauri::command]
-pub fn register_mcp() -> Result<McpStatus, String> {
-    mcp_register::register().map_err(|e| e.to_string())
+pub fn mcp_status(client_id: Option<String>) -> Result<McpStatus, String> {
+    mcp_register::status(client_id).map_err(|e| e.to_string())
 }
 
-/// Remove the MCP server entry from `~/.copilot/mcp-config.json`.
+/// Register (or update) the MCP server in the selected client's config.
 #[tauri::command]
-pub fn unregister_mcp() -> Result<McpStatus, String> {
-    mcp_register::unregister().map_err(|e| e.to_string())
+pub fn register_mcp(client_id: Option<String>) -> Result<McpStatus, String> {
+    mcp_register::register(client_id).map_err(|e| e.to_string())
+}
+
+/// Remove the MCP server entry from the selected client's config.
+#[tauri::command]
+pub fn unregister_mcp(client_id: Option<String>) -> Result<McpStatus, String> {
+    mcp_register::unregister(client_id).map_err(|e| e.to_string())
 }
 
 /// Enable or disable do-not-disturb (auto-decline incoming calls).

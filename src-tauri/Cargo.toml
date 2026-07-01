@@ -23,6 +23,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
+toml_edit = "0.25"
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "sync", "net", "time", "io-util"] }
 tokio-tungstenite = "0.29.0"
 futures-util = "0.3.32"
@@ -34,4 +35,3 @@ tauri-plugin-single-instance = "2.4.2"
 tauri-plugin-notification = "2.3.3"
 base64 = "0.22.1"
 reqwest = { version = "0.12", features = ["json", "multipart"] }
-

@@ -116,28 +116,45 @@ export function stt(audio: string, mime: string, filename: string): Promise<stri
   return invoke("stt", { audio, mime, filename });
 }
 
+/** Supported MCP client, mirrors the Rust `McpClientInfo`. */
+export interface McpClientInfo {
+  id: string;
+  name: string;
+  config_path: string;
+  description: string;
+  restart_hint: string;
+}
+
+/** Supported MCP clients that can receive the voice MCP server. */
+export function mcpClients(): Promise<McpClientInfo[]> {
+  return invoke("mcp_clients");
+}
+
 /** MCP-registration status, mirrors the Rust `McpStatus`. */
 export interface McpStatus {
+  client_id: string;
+  client_name: string;
   registered: boolean;
   up_to_date: boolean;
   config_path: string;
   server_path: string;
   server_exists: boolean;
+  restart_hint: string;
 }
 
-/** Current MCP-registration status (read-only). */
-export function mcpStatus(): Promise<McpStatus> {
-  return invoke("mcp_status");
+/** Current MCP-registration status for a client (read-only). */
+export function mcpStatus(clientId?: string): Promise<McpStatus> {
+  return invoke("mcp_status", { clientId: clientId ?? null });
 }
 
-/** Register (or update) the MCP server with the Copilot CLI. */
-export function registerMcp(): Promise<McpStatus> {
-  return invoke("register_mcp");
+/** Register (or update) the MCP server with a client. */
+export function registerMcp(clientId?: string): Promise<McpStatus> {
+  return invoke("register_mcp", { clientId: clientId ?? null });
 }
 
-/** Remove the MCP server entry from the Copilot CLI config. */
-export function unregisterMcp(): Promise<McpStatus> {
-  return invoke("unregister_mcp");
+/** Remove the MCP server entry from a client config. */
+export function unregisterMcp(clientId?: string): Promise<McpStatus> {
+  return invoke("unregister_mcp", { clientId: clientId ?? null });
 }
 
 /** Enable/disable do-not-disturb (auto-decline incoming calls). */

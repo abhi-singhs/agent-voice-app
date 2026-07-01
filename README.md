@@ -1,6 +1,6 @@
 # Copilot Voice Call
 
-A cross-platform desktop **phone for your Copilot agent**. The agent *calls* you
+A cross-platform desktop **phone for your coding agent**. The agent *calls* you
 through an MCP server; you answer in the app and have a natural, spoken
 back-and-forth. [ElevenLabs](https://elevenlabs.io) provides the agent's voice
 (text-to-speech) and transcribes your replies (speech-to-text).
@@ -14,13 +14,13 @@ back-and-forth. [ElevenLabs](https://elevenlabs.io) provides the agent's voice
 ## How it works
 
 ```
-Copilot Agent (MCP host)
+Agent client (MCP host)
   │  stdio  (call_user / say_and_listen / voice_say / end_call)
   ▼
 crates/mcp-server  ──WS client (127.0.0.1 + token)──►  src-tauri WS server (always-on)
         │ returns no_device if the app is down                 │  Tauri events / commands
         ▼                                                      ▼
-   result → Copilot                                   React webview (UI + Web Audio)
+   result → agent client                              React webview (UI + Web Audio)
                                                       • ring / answer / hang-up
                                                       • mic capture + VAD
                                                       • TTS playback
@@ -36,7 +36,7 @@ crates/mcp-server  ──WS client (127.0.0.1 + token)──►  src-tauri WS se
 
 - The **desktop app** is always-on (lives in the tray/menu bar) and owns the
   hardware — microphone and speaker. It runs a loopback WebSocket server.
-- The **MCP server** is ephemeral: the Copilot CLI spawns it per session. It is
+- The **MCP server** is ephemeral: the agent client spawns it per session. It is
   the WebSocket *client*. If the app isn't running it returns `no_device` so the
   agent can gracefully fall back to text.
 - **Discovery/auth:** on startup the app writes `~/.copilot/voice-call/runtime.json`
@@ -63,7 +63,8 @@ Typical flow: `call_user` → (user answers) → one or more `say_and_listen` tu
 - **macOS** (primary target; Windows via WebView2 should work, Linux/WebKitGTK is
   best-effort for microphone support).
 - **Rust** (stable) + **Cargo**, **Node** 20+, and **pnpm**.
-- The **Copilot CLI** with MCP support (`~/.copilot/mcp-config.json`).
+- An MCP-capable agent client. In-app registration supports Copilot CLI, Claude
+  Code, Codex CLI, and OpenCode.
 - An **ElevenLabs** account + API key (free tier is enough: TTS, STT via
   `scribe_v1`, and premade voices all work).
 
@@ -109,16 +110,17 @@ Then open **Setup & status** in the app (gear icon on the idle screen) to:
 
 1. Add your ElevenLabs API key and pick a voice (or confirm the one you already
    configured).
-2. **Register with Copilot** — writes the MCP server into
-   `~/.copilot/mcp-config.json` (see below).
+2. Pick an MCP client and **Register** — writes the MCP server into that
+   client's config (see below).
 
-Restart your Copilot CLI session so it picks up the new MCP server. From a
-Copilot session, ask the agent to call you (it will invoke `call_user`).
+Restart your agent client so it picks up the new MCP server. From an agent
+session, ask it to call you (it will invoke `call_user`).
 
 ### Registering the MCP server
 
-The app can self-register (Setup panel → *Register with Copilot*). It writes an
-entry to `~/.copilot/mcp-config.json`, preserving any existing servers:
+The app can self-register (Setup panel → *MCP server* → pick a client →
+*Register*). It preserves any existing servers and writes one of these config
+shapes:
 
 ```json
 {
@@ -133,11 +135,23 @@ entry to `~/.copilot/mcp-config.json`, preserving any existing servers:
 }
 ```
 
+Supported clients and default config files:
+
+| Client | Config file |
+| --- | --- |
+| Copilot CLI | `~/.copilot/mcp-config.json` |
+| Claude Code | `~/.claude.json` |
+| Codex CLI | `~/.codex/config.toml` |
+| OpenCode | `~/.config/opencode/opencode.json` |
+
 The command path points at the MCP binary next to the app executable (works in
 both dev and a packaged build). You can also register from the CLI:
 
 ```bash
-node scripts/install-mcp.mjs            # build release + register
+node scripts/install-mcp.mjs                         # build release + register with Copilot CLI
+node scripts/install-mcp.mjs --client claude-code
+node scripts/install-mcp.mjs --client codex
+node scripts/install-mcp.mjs --client opencode
 node scripts/install-mcp.mjs --uninstall
 node scripts/install-mcp.mjs --dry-run
 ```
@@ -228,14 +242,15 @@ node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool dire
 ## Troubleshooting
 
 - **Agent says "no device":** the app isn't running, or the MCP server can't reach
-  it. Launch the app and confirm the Setup panel shows *Registered*. Delete a
+  it. Launch the app and confirm the Setup panel shows *Registered* for the
+  client you are using. Delete a
   stale `~/.copilot/voice-call/runtime.json` if the app was force-killed.
 - **No microphone prompt / can't hear you:** grant mic access in System Settings →
   Privacy & Security → Microphone. On first use macOS prompts automatically.
 - **"MCP binary not found" in Setup:** run `cargo build -p voice-mcp-server` (dev)
   or `pnpm sidecar` before registering.
 - **Changed the MCP path:** re-open Setup and choose *Update path*, then restart
-  your Copilot session.
+  your agent client.
 
 ---
 
@@ -250,5 +265,5 @@ node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool dire
   usual ack for a one-way announcement). Because the mic is open while the agent
   speaks, loud speaker echo can occasionally false-trigger hands-free barge-in
   despite echo cancellation — toggle it off if that happens.
-- If two Copilot sessions call at once, the app currently handles one call at a
+- If two agent sessions call at once, the app currently handles one call at a
   time; multi-session queueing is a future enhancement.

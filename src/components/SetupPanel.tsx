@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   listVoices,
+  mcpClients as listMcpClients,
   mcpStatus,
   registerMcp,
   saveVoiceConfig,
   unregisterMcp,
   voiceConfig,
+  type McpClientInfo,
   type McpStatus,
   type VoiceConfigInfo,
   type VoiceSummary,
@@ -15,9 +17,11 @@ import {
 /**
  * First-run / settings panel shown from the idle screen. Surfaces the two
  * things a user must get right for a call to work: an ElevenLabs voice config
- * and the MCP server registered with the Copilot CLI.
+ * and the MCP server registered with the agent client.
  */
 export function SetupPanel({ onClose }: { onClose: () => void }) {
+  const [mcpClientOptions, setMcpClientOptions] = useState<McpClientInfo[]>([]);
+  const [selectedMcpClientId, setSelectedMcpClientId] = useState("copilot");
   const [voice, setVoice] = useState<VoiceConfigInfo | null>(null);
   const [voiceErr, setVoiceErr] = useState<string | null>(null);
   const [mcp, setMcp] = useState<McpStatus | null>(null);
@@ -43,9 +47,19 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
     }
   }, []);
 
-  const refreshMcp = useCallback(async () => {
+  const refreshMcpClients = useCallback(async () => {
     try {
-      setMcp(await mcpStatus());
+      setMcpClientOptions(await listMcpClients());
+      setMcpErr(null);
+    } catch (e) {
+      setMcpClientOptions([]);
+      setMcpErr(errMessage(e));
+    }
+  }, []);
+
+  const refreshMcp = useCallback(async (clientId: string) => {
+    try {
+      setMcp(await mcpStatus(clientId));
       setMcpErr(null);
     } catch (e) {
       setMcp(null);
@@ -55,11 +69,19 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     void refreshVoice();
-    void refreshMcp();
-  }, [refreshVoice, refreshMcp]);
+    void refreshMcpClients();
+  }, [refreshVoice, refreshMcpClients]);
+
+  useEffect(() => {
+    void refreshMcp(selectedMcpClientId);
+  }, [refreshMcp, selectedMcpClientId]);
 
   const voiceReady = !!voice?.configured;
-  const mcpReady = !!mcp?.registered && !!mcp?.up_to_date;
+  const selectedMcpStatus = mcp?.client_id === selectedMcpClientId ? mcp : null;
+  const selectedMcpClient = mcpClientOptions.find((c) => c.id === selectedMcpClientId);
+  const mcpClientName =
+    selectedMcpStatus?.client_name ?? selectedMcpClient?.name ?? "selected client";
+  const mcpReady = !!selectedMcpStatus?.registered && !!selectedMcpStatus?.up_to_date;
 
   /** Fetch voices with an explicit key (empty string reuses the stored key). */
   const fetchVoices = useCallback(
@@ -129,7 +151,7 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
   const doRegister = async () => {
     setBusy(true);
     try {
-      setMcp(await registerMcp());
+      setMcp(await registerMcp(selectedMcpClientId));
       setMcpErr(null);
     } catch (e) {
       setMcpErr(errMessage(e));
@@ -141,7 +163,7 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
   const doUnregister = async () => {
     setBusy(true);
     try {
-      setMcp(await unregisterMcp());
+      setMcp(await unregisterMcp(selectedMcpClientId));
       setMcpErr(null);
     } catch (e) {
       setMcpErr(errMessage(e));
@@ -275,33 +297,63 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
         <div className="setup-card">
           <div className="setup-card__head">
             <span className={`setup-dot ${mcpReady ? "setup-dot--ok" : "setup-dot--warn"}`} />
-            <h2 className="setup-card__title">Copilot MCP server</h2>
+            <h2 className="setup-card__title">MCP server</h2>
           </div>
 
-          {mcp?.registered ? (
-            mcp.up_to_date ? (
+          <label className="setup-field">
+            <span className="setup-label">Client</span>
+            <select
+              className="setup-select"
+              value={selectedMcpClientId}
+              onChange={(e) => setSelectedMcpClientId(e.target.value)}
+              disabled={busy}
+            >
+              {mcpClientOptions.length ? (
+                mcpClientOptions.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))
+              ) : (
+                <option value="copilot">Copilot CLI</option>
+              )}
+            </select>
+          </label>
+
+          {selectedMcpClient?.description && (
+            <p className="setup-muted setup-hint">{selectedMcpClient.description}</p>
+          )}
+
+          {selectedMcpStatus?.registered ? (
+            selectedMcpStatus.up_to_date ? (
               <p className="setup-card__body">
-                Registered with Copilot.
+                Registered with {mcpClientName}.
                 <br />
-                <span className="setup-muted setup-path">{mcp.server_path}</span>
+                <span className="setup-muted setup-path">{selectedMcpStatus.server_path}</span>
               </p>
             ) : (
               <p className="setup-card__body">
                 Registered, but the path is out of date. Update it to point at this
                 build.
                 <br />
-                <span className="setup-muted setup-path">{mcp.server_path}</span>
+                <span className="setup-muted setup-path">{selectedMcpStatus.server_path}</span>
               </p>
             )
           ) : (
             <p className="setup-card__body">
-              Not registered yet. Register so the agent can call you.
+              Not registered yet. Register so {mcpClientName} can call you.
               <br />
-              <span className="setup-muted setup-path">{mcp?.server_path}</span>
+              <span className="setup-muted setup-path">{selectedMcpStatus?.server_path}</span>
             </p>
           )}
+          <p className="setup-muted setup-hint">
+            Config:{" "}
+            <span className="setup-path">
+              {selectedMcpStatus?.config_path ?? selectedMcpClient?.config_path}
+            </span>
+          </p>
 
-          {mcp && !mcp.server_exists && (
+          {selectedMcpStatus && !selectedMcpStatus.server_exists && (
             <p className="setup-err">
               MCP binary not found. Build it: <code>cargo build -p voice-mcp-server</code>
             </p>
@@ -321,22 +373,23 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
               <button
                 className="setup-btn"
                 onClick={() => void doRegister()}
-                disabled={busy || (mcp ? !mcp.server_exists : false)}
+                disabled={busy || (selectedMcpStatus ? !selectedMcpStatus.server_exists : false)}
               >
-                {mcp?.registered ? "Update path" : "Register with Copilot"}
+                {selectedMcpStatus?.registered ? "Update path" : `Register with ${mcpClientName}`}
               </button>
             )}
             <button
               className="setup-btn setup-btn--ghost"
-              onClick={() => void refreshMcp()}
+              onClick={() => void refreshMcp(selectedMcpClientId)}
               disabled={busy}
             >
               Recheck
             </button>
           </div>
           <p className="setup-muted setup-hint">
-            After registering, restart your Copilot CLI session so it picks up the new
-            server.
+            {selectedMcpStatus?.restart_hint ??
+              selectedMcpClient?.restart_hint ??
+              "After registering, restart your agent client so it picks up the new server."}
           </p>
         </div>
 

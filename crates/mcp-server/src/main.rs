@@ -1,6 +1,6 @@
 //! Copilot Voice Call MCP server.
 //!
-//! Spawned by the Copilot CLI over stdio. Exposes voice tools and bridges them
+//! Spawned by an MCP-capable agent client over stdio. Exposes voice tools and bridges them
 //! to the always-on desktop app over a localhost WebSocket. If no app is
 //! reachable, tools return a `no_device` / `call_ended` status so the agent can
 //! gracefully fall back to text.
