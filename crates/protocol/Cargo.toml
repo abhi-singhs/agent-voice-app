@@ -1,0 +1,11 @@
+[package]
+name = "voice-protocol"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Shared WebSocket protocol types for Copilot Voice Call"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

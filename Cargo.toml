@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["src-tauri", "crates/protocol", "crates/mcp-server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Abhi Singh"]
+license = "MIT"
+repository = "https://github.com/abhi-singhs/agent-voice-app"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"

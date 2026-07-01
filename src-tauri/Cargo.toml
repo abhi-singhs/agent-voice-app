@@ -1,0 +1,37 @@
+[package]
+name = "copilot-voice-call"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Copilot Voice Call — talk to the Copilot agent like a phone call"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "sync", "net", "time", "io-util"] }
+tokio-tungstenite = "0.29.0"
+futures-util = "0.3.32"
+dirs = "6.0.0"
+getrandom = "0.4.3"
+anyhow = { workspace = true }
+voice-protocol = { path = "../crates/protocol" }
+tauri-plugin-single-instance = "2.4.2"
+tauri-plugin-notification = "2.3.3"
+base64 = "0.22.1"
+reqwest = { version = "0.12", features = ["json", "multipart"] }
+

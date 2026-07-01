@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Copilot Voice Call",
+  "version": "0.1.0",
+  "identifier": "com.abhisingh.copilot-voice-call",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build && node scripts/prepare-sidecar.mjs",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Copilot Voice Call",
+        "width": 420,
+        "height": 720
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "Talk to the Copilot agent like a phone call.",
+    "longDescription": "Copilot Voice Call is a desktop phone for your Copilot agent. The agent calls you through an MCP server; you answer in the app and have a spoken back-and-forth using ElevenLabs text-to-speech and speech-to-text.",
+    "copyright": "Copyright © 2026 abhi-singh",
+    "externalBin": ["binaries/copilot-voice-mcp"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
+  }
+}

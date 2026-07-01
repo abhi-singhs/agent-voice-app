@@ -1,0 +1,22 @@
+[package]
+name = "voice-mcp-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Copilot Voice Call MCP server (stdio) that bridges the agent to the desktop app"
+
+[[bin]]
+name = "copilot-voice-mcp"
+path = "src/main.rs"
+
+[dependencies]
+dirs = "6.0.0"
+futures-util = "0.3.32"
+rmcp = { version = "2.0.0", features = ["server", "transport-io", "macros"] }
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
+tokio-tungstenite = "0.29.0"
+voice-protocol = { path = "../protocol" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
