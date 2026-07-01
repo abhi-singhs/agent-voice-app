@@ -12,6 +12,7 @@ use voice_protocol::{AckStatus, CallStatus, ListenStatus, ServerMessage};
 
 use crate::config::{ElevenLabsConfig, VoiceConfigInfo};
 use crate::elevenlabs;
+use crate::mcp_register::{self, McpStatus};
 use crate::session::{FrontendResponse, SessionManager};
 
 /// Reply to an `IncomingCall` request (answered / declined / timeout).
@@ -79,4 +80,22 @@ pub async fn stt(
         .map_err(|e| e.to_string())?;
     eprintln!("voice-call: stt {} bytes -> {:?}", audio.len(), text);
     Ok(text)
+}
+
+/// Report whether the MCP server is registered with the Copilot CLI.
+#[tauri::command]
+pub fn mcp_status() -> Result<McpStatus, String> {
+    mcp_register::status().map_err(|e| e.to_string())
+}
+
+/// Register (or update) the MCP server in `~/.copilot/mcp-config.json`.
+#[tauri::command]
+pub fn register_mcp() -> Result<McpStatus, String> {
+    mcp_register::register().map_err(|e| e.to_string())
+}
+
+/// Remove the MCP server entry from `~/.copilot/mcp-config.json`.
+#[tauri::command]
+pub fn unregister_mcp() -> Result<McpStatus, String> {
+    mcp_register::unregister().map_err(|e| e.to_string())
 }

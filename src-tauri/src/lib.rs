@@ -3,6 +3,7 @@
 mod commands;
 pub mod config;
 pub mod elevenlabs;
+mod mcp_register;
 mod runtime;
 mod session;
 mod ws_server;
@@ -79,7 +80,10 @@ pub fn run() {
             commands::notify_hangup,
             commands::voice_config,
             commands::tts,
-            commands::stt
+            commands::stt,
+            commands::mcp_status,
+            commands::register_mcp,
+            commands::unregister_mcp
         ])
         .build(context)
         .expect("error while building tauri application")

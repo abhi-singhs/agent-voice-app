@@ -82,3 +82,27 @@ export async function tts(text: string): Promise<ArrayBuffer> {
 export function stt(audio: string, mime: string, filename: string): Promise<string> {
   return invoke("stt", { audio, mime, filename });
 }
+
+/** MCP-registration status, mirrors the Rust `McpStatus`. */
+export interface McpStatus {
+  registered: boolean;
+  up_to_date: boolean;
+  config_path: string;
+  server_path: string;
+  server_exists: boolean;
+}
+
+/** Current MCP-registration status (read-only). */
+export function mcpStatus(): Promise<McpStatus> {
+  return invoke("mcp_status");
+}
+
+/** Register (or update) the MCP server with the Copilot CLI. */
+export function registerMcp(): Promise<McpStatus> {
+  return invoke("register_mcp");
+}
+
+/** Remove the MCP server entry from the Copilot CLI config. */
+export function unregisterMcp(): Promise<McpStatus> {
+  return invoke("unregister_mcp");
+}
