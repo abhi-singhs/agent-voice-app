@@ -1,0 +1,14 @@
+[package]
+name = "voice-mcp-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Copilot Voice Call MCP server (stdio) that bridges the agent to the desktop app"
+
+[[bin]]
+name = "copilot-voice-mcp"
+path = "src/main.rs"
+
+[dependencies]
+voice-protocol = { path = "../protocol" }
