@@ -691,3 +691,43 @@ body {
 .setup-btn--danger {
   background: var(--danger);
 }
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.setup-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.setup-input,
+.setup-select {
+  width: 100%;
+  background: var(--panel-soft);
+  border: 1px solid #2b365a;
+  border-radius: 10px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.setup-select {
+  appearance: none;
+  cursor: pointer;
+}
+
+.setup-input:focus,
+.setup-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}

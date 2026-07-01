@@ -73,6 +73,39 @@ export function voiceConfig(): Promise<VoiceConfigInfo> {
   return invoke("voice_config");
 }
 
+/** A voice available on the ElevenLabs account, mirrors the Rust `VoiceSummary`. */
+export interface VoiceSummary {
+  voice_id: string;
+  name: string;
+  category: string | null;
+}
+
+/**
+ * List the voices for an API key. Pass the key the user just typed, or omit it
+ * to reuse the stored key (e.g. to change voice without re-entering the key).
+ * Throws if the key is invalid or missing.
+ */
+export function listVoices(apiKey?: string): Promise<VoiceSummary[]> {
+  return invoke("list_voices", { apiKey: apiKey ?? null });
+}
+
+/**
+ * Save the API key and selected voice to `~/.copilot/elevenlabs/config.json`,
+ * merging with any existing config. Omit `apiKey` to keep the stored key.
+ * Resolves with the updated (non-secret) config.
+ */
+export function saveVoiceConfig(args: {
+  apiKey?: string;
+  voiceId: string;
+  voiceName?: string | null;
+}): Promise<VoiceConfigInfo> {
+  return invoke("save_voice_config", {
+    apiKey: args.apiKey ?? null,
+    voiceId: args.voiceId,
+    voiceName: args.voiceName ?? null,
+  });
+}
+
 /** Synthesize `text` to speech; resolves with mp3 bytes. */
 export async function tts(text: string): Promise<ArrayBuffer> {
   return invoke<ArrayBuffer>("tts", { text });

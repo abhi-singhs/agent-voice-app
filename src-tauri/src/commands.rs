@@ -53,6 +53,71 @@ pub fn voice_config() -> Result<VoiceConfigInfo, String> {
         .map_err(|e| e.to_string())
 }
 
+/// Resolve which API key to use: the one passed from the UI, else the stored key.
+fn resolve_key(api_key: Option<String>) -> Result<String, String> {
+    if let Some(k) = api_key {
+        let k = k.trim().to_string();
+        if !k.is_empty() {
+            return Ok(k);
+        }
+    }
+    let stored = ElevenLabsConfig::load_or_default().api_key.trim().to_string();
+    if stored.is_empty() {
+        return Err("No API key provided and none saved yet.".to_string());
+    }
+    Ok(stored)
+}
+
+/// List the voices available for an API key (the passed one, or the stored key
+/// when omitted). Also validates the key — an invalid key returns an error.
+#[tauri::command]
+pub async fn list_voices(
+    client: State<'_, Client>,
+    api_key: Option<String>,
+) -> Result<Vec<elevenlabs::VoiceSummary>, String> {
+    let key = resolve_key(api_key)?;
+    elevenlabs::list_voices(&client, &key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Save the ElevenLabs API key and selected voice, merging with any existing
+/// config so unrelated fields (model, format, etc.) are preserved.
+#[tauri::command]
+pub fn save_voice_config(
+    api_key: Option<String>,
+    voice_id: String,
+    voice_name: Option<String>,
+) -> Result<VoiceConfigInfo, String> {
+    let voice_id = voice_id.trim().to_string();
+    if voice_id.is_empty() {
+        return Err("A voice must be selected.".to_string());
+    }
+
+    let mut cfg = ElevenLabsConfig::load_or_default();
+
+    if let Some(k) = api_key {
+        let k = k.trim().to_string();
+        if !k.is_empty() {
+            cfg.api_key = k;
+        }
+    }
+    if cfg.api_key.trim().is_empty() {
+        return Err("An API key is required.".to_string());
+    }
+
+    cfg.voice_id = voice_id;
+    let new_name = voice_name
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    if new_name.is_some() {
+        cfg.voice_name = new_name;
+    }
+
+    cfg.save().map_err(|e| e.to_string())?;
+    Ok(cfg.info())
+}
+
 /// Synthesize speech for `text`; returns raw audio bytes (mp3) to the webview.
 #[tauri::command]
 pub async fn tts(client: State<'_, Client>, text: String) -> Result<Response, String> {

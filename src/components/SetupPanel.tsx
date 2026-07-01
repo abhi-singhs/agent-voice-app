@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  listVoices,
   mcpStatus,
   registerMcp,
+  saveVoiceConfig,
   unregisterMcp,
   voiceConfig,
   type McpStatus,
   type VoiceConfigInfo,
+  type VoiceSummary,
 } from "../ipc";
 
 /**
@@ -20,6 +23,15 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
   const [mcp, setMcp] = useState<McpStatus | null>(null);
   const [mcpErr, setMcpErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Editable ElevenLabs form state.
+  const [editing, setEditing] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [voices, setVoices] = useState<VoiceSummary[]>([]);
+  const [selectedVoiceId, setSelectedVoiceId] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formErr, setFormErr] = useState<string | null>(null);
 
   const refreshVoice = useCallback(async () => {
     try {
@@ -46,6 +58,74 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
     void refreshMcp();
   }, [refreshVoice, refreshMcp]);
 
+  const voiceReady = !!voice?.configured;
+  const mcpReady = !!mcp?.registered && !!mcp?.up_to_date;
+
+  /** Fetch voices with an explicit key (empty string reuses the stored key). */
+  const fetchVoices = useCallback(
+    async (key: string) => {
+      setFetching(true);
+      setFormErr(null);
+      try {
+        const list = await listVoices(key ? key : undefined);
+        setVoices(list);
+        setSelectedVoiceId((prev) => {
+          const current = voice?.voice_id;
+          if (current && list.some((v) => v.voice_id === current)) return current;
+          if (prev && list.some((v) => v.voice_id === prev)) return prev;
+          return list[0]?.voice_id ?? "";
+        });
+        if (list.length === 0) setFormErr("No voices found on this account.");
+      } catch (e) {
+        setVoices([]);
+        setFormErr(errMessage(e));
+      } finally {
+        setFetching(false);
+      }
+    },
+    [voice?.voice_id],
+  );
+
+  const openEdit = () => {
+    setApiKeyInput("");
+    setVoices([]);
+    setSelectedVoiceId("");
+    setFormErr(null);
+    setEditing(true);
+    // Already configured? Reuse the stored key so voices load immediately.
+    if (voiceReady) void fetchVoices("");
+  };
+
+  const closeEdit = () => {
+    setEditing(false);
+    setApiKeyInput("");
+    setVoices([]);
+    setSelectedVoiceId("");
+    setFormErr(null);
+  };
+
+  const doSave = async () => {
+    if (!selectedVoiceId) return;
+    setSaving(true);
+    setFormErr(null);
+    try {
+      const key = apiKeyInput.trim();
+      const name = voices.find((v) => v.voice_id === selectedVoiceId)?.name ?? null;
+      const info = await saveVoiceConfig({
+        apiKey: key ? key : undefined,
+        voiceId: selectedVoiceId,
+        voiceName: name,
+      });
+      setVoice(info);
+      setVoiceErr(null);
+      closeEdit();
+    } catch (e) {
+      setFormErr(errMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const doRegister = async () => {
     setBusy(true);
     try {
@@ -70,8 +150,7 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const voiceReady = !!voice?.configured;
-  const mcpReady = !!mcp?.registered && !!mcp?.up_to_date;
+  const canFetch = voiceReady || apiKeyInput.trim().length > 0;
 
   return (
     <section className="screen screen--setup">
@@ -89,26 +168,107 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
             <span className={`setup-dot ${voiceReady ? "setup-dot--ok" : "setup-dot--warn"}`} />
             <h2 className="setup-card__title">ElevenLabs voice</h2>
           </div>
-          {voiceReady ? (
-            <p className="setup-card__body">
-              Ready — <strong>{voice?.voice_name ?? voice?.voice_id}</strong>
-              <br />
-              <span className="setup-muted">
-                model {voice?.model_id}
-                {voice && !voice.enabled ? " · disabled in config" : ""}
-              </span>
-            </p>
-          ) : (
-            <p className="setup-card__body">
-              Not configured. Create{" "}
-              <code>~/.copilot/elevenlabs/config.json</code> with your{" "}
-              <code>apiKey</code> and a <code>voiceId</code>.
-              {voiceErr && <span className="setup-err">{voiceErr}</span>}
-            </p>
+
+          {!editing && (
+            <>
+              {voiceReady ? (
+                <p className="setup-card__body">
+                  Ready — <strong>{voice?.voice_name ?? voice?.voice_id}</strong>
+                  <br />
+                  <span className="setup-muted">
+                    model {voice?.model_id}
+                    {voice && !voice.enabled ? " · disabled in config" : ""}
+                  </span>
+                </p>
+              ) : (
+                <p className="setup-card__body">
+                  Not configured. Add your ElevenLabs API key and pick a voice.
+                  {voiceErr && <span className="setup-err">{voiceErr}</span>}
+                </p>
+              )}
+              <div className="setup-actions">
+                <button className="setup-btn" onClick={openEdit}>
+                  {voiceReady ? "Change" : "Set up"}
+                </button>
+                <button
+                  className="setup-btn setup-btn--ghost"
+                  onClick={() => void refreshVoice()}
+                >
+                  Recheck
+                </button>
+              </div>
+            </>
           )}
-          <button className="setup-btn setup-btn--ghost" onClick={() => void refreshVoice()}>
-            Recheck
-          </button>
+
+          {editing && (
+            <div className="setup-form">
+              <label className="setup-field">
+                <span className="setup-label">API key</span>
+                <input
+                  className="setup-input"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={voiceReady ? "Leave blank to keep current key" : "sk_..."}
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                />
+              </label>
+
+              <div className="setup-actions">
+                <button
+                  className="setup-btn setup-btn--ghost"
+                  onClick={() => void fetchVoices(apiKeyInput.trim())}
+                  disabled={fetching || saving || !canFetch}
+                >
+                  {fetching ? "Fetching…" : voices.length ? "Refresh voices" : "Fetch voices"}
+                </button>
+              </div>
+
+              {voices.length > 0 && (
+                <label className="setup-field">
+                  <span className="setup-label">Voice</span>
+                  <select
+                    className="setup-select"
+                    value={selectedVoiceId}
+                    onChange={(e) => setSelectedVoiceId(e.target.value)}
+                    disabled={saving}
+                  >
+                    {voices.map((v) => (
+                      <option key={v.voice_id} value={v.voice_id}>
+                        {v.name}
+                        {v.category ? ` (${v.category})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {formErr && <p className="setup-err">{formErr}</p>}
+
+              <div className="setup-actions">
+                <button
+                  className="setup-btn"
+                  onClick={() => void doSave()}
+                  disabled={saving || fetching || !selectedVoiceId}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+                <button
+                  className="setup-btn setup-btn--ghost"
+                  onClick={closeEdit}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+              </div>
+              <p className="setup-muted setup-hint">
+                Your key is stored locally in{" "}
+                <code>~/.copilot/elevenlabs/config.json</code> and never leaves the app
+                except to ElevenLabs.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* MCP registration */}

@@ -69,7 +69,15 @@ Typical flow: `call_user` → (user answers) → one or more `say_and_listen` tu
 
 ### ElevenLabs config
 
-Create `~/.copilot/elevenlabs/config.json`:
+The easiest way is **in the app**: open **Setup & status** (gear icon on the
+idle screen), click **Set up** under *ElevenLabs voice*, paste your API key,
+**Fetch voices**, pick one, and **Save**. The app writes
+`~/.copilot/elevenlabs/config.json` for you (owner-only) and picks it up on the
+next call — no restart needed. Fetching voices also validates the key. Later,
+click **Change** to switch voice (no need to re-enter the key) or paste a new
+key.
+
+Prefer to do it by hand? Create `~/.copilot/elevenlabs/config.json`:
 
 ```json
 {
@@ -84,7 +92,8 @@ Create `~/.copilot/elevenlabs/config.json`:
 ```
 
 Only `apiKey` and `voiceId` are required; the rest have sensible defaults.
-`JBFqnCBsd6RMkjVDRZzb` is the premade **George** voice.
+`JBFqnCBsd6RMkjVDRZzb` is the premade **George** voice (used as the default when
+you set up in-app without choosing another).
 
 ---
 
@@ -98,7 +107,8 @@ pnpm tauri dev                    # launch the app (Rust backend + webview)
 
 Then open **Setup & status** in the app (gear icon on the idle screen) to:
 
-1. Confirm your ElevenLabs voice is detected.
+1. Add your ElevenLabs API key and pick a voice (or confirm the one you already
+   configured).
 2. **Register with Copilot** — writes the MCP server into
    `~/.copilot/mcp-config.json` (see below).
 

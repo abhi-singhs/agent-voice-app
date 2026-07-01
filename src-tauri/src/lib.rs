@@ -80,6 +80,8 @@ pub fn run() {
             commands::respond_ack,
             commands::notify_hangup,
             commands::voice_config,
+            commands::list_voices,
+            commands::save_voice_config,
             commands::tts,
             commands::stt,
             commands::mcp_status,
