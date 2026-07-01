@@ -19,7 +19,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -30,4 +30,6 @@ dirs = "6.0.0"
 getrandom = "0.4.3"
 anyhow = { workspace = true }
 voice-protocol = { path = "../crates/protocol" }
+tauri-plugin-single-instance = "2.4.2"
+tauri-plugin-notification = "2.3.3"
 

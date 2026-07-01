@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::Message;
@@ -173,6 +173,8 @@ async fn handle_request(
             timeout_sec,
         } => {
             let rx = state.register_pending(id);
+            // Raise the window so the user sees the ring even if it was hidden.
+            reveal_main(&app);
             emit(&app, FrontendRequest::IncomingCall {
                 id,
                 reason,
@@ -250,5 +252,14 @@ async fn await_ack(
 fn emit(app: &AppHandle, req: FrontendRequest) {
     if let Err(e) = app.emit(REQUEST_EVENT, req) {
         eprintln!("voice-call: failed to emit {REQUEST_EVENT}: {e}");
+    }
+}
+
+/// Show, unminimize, and focus the main window (raise-on-ring).
+fn reveal_main(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.unminimize();
+        let _ = win.show();
+        let _ = win.set_focus();
     }
 }
