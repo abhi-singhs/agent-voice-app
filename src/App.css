@@ -243,6 +243,15 @@ body {
   border-color: var(--accent);
 }
 
+.call-note {
+  background: rgba(255, 176, 32, 0.12);
+  border: 1px solid rgba(255, 176, 32, 0.5);
+  color: #ffcf72;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
 .transcript {
   flex: 1;
   overflow-y: auto;

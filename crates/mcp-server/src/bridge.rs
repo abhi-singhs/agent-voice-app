@@ -58,16 +58,44 @@ impl Bridge {
     }
 
     /// Ensure a live connection exists, (re)connecting if necessary.
+    ///
+    /// A first connection is attempted once so a truly-down app yields
+    /// `no_device` promptly. A *reconnection* (a previously-live socket that
+    /// dropped, e.g. the app restarting mid-call) is retried with a short
+    /// bounded backoff to ride out the gap.
     async fn ensure(&self) -> Result<()> {
         let mut guard = self.conn.lock().await;
-        if let Some(c) = guard.as_ref() {
-            if c.alive.load(Ordering::SeqCst) {
-                return Ok(());
+        let reconnecting = match guard.as_ref() {
+            Some(c) if c.alive.load(Ordering::SeqCst) => return Ok(()),
+            Some(_) => true,
+            None => false,
+        };
+
+        if !reconnecting {
+            let conn = connect(&self.session).await?;
+            *guard = Some(conn);
+            return Ok(());
+        }
+
+        let backoffs = [
+            Duration::from_millis(0),
+            Duration::from_millis(150),
+            Duration::from_millis(350),
+        ];
+        let mut last_err = anyhow!("could not reconnect to desktop app");
+        for wait in backoffs {
+            if !wait.is_zero() {
+                tokio::time::sleep(wait).await;
+            }
+            match connect(&self.session).await {
+                Ok(conn) => {
+                    *guard = Some(conn);
+                    return Ok(());
+                }
+                Err(e) => last_err = e,
             }
         }
-        let conn = connect(&self.session).await?;
-        *guard = Some(conn);
-        Ok(())
+        Err(last_err)
     }
 
     /// Send a request (built with the allocated id) and await the correlated reply.

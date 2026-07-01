@@ -65,14 +65,18 @@ export function useCallMachine(): CallController {
     }
   }, [state.phase]);
 
-  // Speak text via TTS; resolves when playback ends. Never throws — a TTS
-  // failure just means the captions play silently.
-  const speak = useCallback(async (text: string) => {
+  // Speak text via TTS; resolves true on success, false if audio failed. A
+  // failure is non-fatal — captions still show — but we surface a note so the
+  // user knows to rely on text.
+  const speak = useCallback(async (text: string): Promise<boolean> => {
     try {
       const bytes = await tts(text);
       await playTts(bytes);
+      return true;
     } catch (err) {
       console.error("TTS failed:", err);
+      dispatch({ type: "note", text: "Couldn’t play audio — check ElevenLabs setup." });
+      return false;
     }
   }, []);
 
@@ -85,6 +89,14 @@ export function useCallMachine(): CallController {
     const p = pendingRef.current;
     if (!(p?.kind === "listen" && p.id === id)) return;
 
+    if (res.status === "error") {
+      // Mic capture failed (e.g. permission denied) — let the user type.
+      dispatch({ type: "note", text: "Microphone unavailable — type your reply below." });
+      void respondListen(id, null, "no_speech");
+      dispatch({ type: "return_to_connected" });
+      return;
+    }
+
     if (res.status === "ok") {
       try {
         const text = (await stt(res.wavBase64, "audio/wav", "reply.wav")).trim();
@@ -95,9 +107,10 @@ export function useCallMachine(): CallController {
         }
       } catch (err) {
         console.error("STT failed:", err);
+        dispatch({ type: "note", text: "Couldn’t transcribe audio — type your reply below." });
       }
     }
-    // no_speech / error / empty transcript
+    // no_speech / empty transcript
     void respondListen(id, null, "no_speech");
     dispatch({ type: "return_to_connected" });
   }, []);

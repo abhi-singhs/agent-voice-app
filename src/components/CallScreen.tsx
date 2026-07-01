@@ -54,6 +54,8 @@ export function CallScreen({
         <span className="call-status">{statusText(state.phase)}</span>
       </header>
 
+      {state.note && <div className="call-note">{state.note}</div>}
+
       {state.caption && (
         <div className={`caption ${state.phase === "speaking" ? "caption--live" : ""}`}>
           {state.caption}

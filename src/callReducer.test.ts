@@ -97,4 +97,26 @@ describe("call reducer", () => {
     s = reducer(s, { type: "set_ptt", value: true });
     expect(s.pushToTalk).toBe(true);
   });
+
+  it("sets a note and clears it on the next agent turn", () => {
+    let s = reducer(initialState, { type: "note", text: "Microphone unavailable" });
+    expect(s.note).toBe("Microphone unavailable");
+    s = reducer(s, { type: "agent_say", text: "Hello", pending: null });
+    expect(s.note).toBeNull();
+  });
+
+  it("return_to_connected clears caption and pending without a transcript line", () => {
+    const s = run(
+      { type: "ring", id: 1, reason: null },
+      { type: "answered" },
+      { type: "agent_say", text: "Hi?", pending: { kind: "listen", id: 2 } },
+      { type: "speaking_done" },
+      { type: "return_to_connected" },
+    );
+    expect(s.phase).toBe("connected");
+    expect(s.pending).toBeNull();
+    expect(s.caption).toBeNull();
+    // Only the agent line exists; no empty user line was appended.
+    expect(s.transcript).toHaveLength(1);
+  });
 });

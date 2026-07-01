@@ -150,6 +150,28 @@ describe("useCallMachine", () => {
     expect(result.current.state.phase).toBe("connected");
   });
 
+  it("surfaces a note and returns no_speech when the mic fails", async () => {
+    nextListenResult = Promise.resolve({ status: "error", error: "denied" });
+    const { result } = await connect(1);
+    emit({ kind: "say_and_listen", id: 2, text: "Hi?", listen: true, listen_timeout_sec: null });
+    await flush();
+
+    expect(stt).not.toHaveBeenCalled();
+    expect(respondListen).toHaveBeenCalledWith(2, null, "no_speech");
+    expect(result.current.state.note).toMatch(/microphone/i);
+    expect(result.current.state.phase).toBe("connected");
+  });
+
+  it("surfaces a note when TTS playback fails", async () => {
+    playTts.mockImplementationOnce(() => Promise.reject(new Error("no audio")));
+    nextListenResult = Promise.resolve({ status: "no_speech" });
+    const { result } = await connect(1);
+    emit({ kind: "say_and_listen", id: 2, text: "Hi?", listen: true, listen_timeout_sec: null });
+    await flush();
+
+    expect(result.current.state.note).toMatch(/audio/i);
+  });
+
   it("voice_say speaks then acks and returns to connected", async () => {
     const { result } = await connect(1);
     emit({ kind: "say", id: 2, text: "Heads up!" });

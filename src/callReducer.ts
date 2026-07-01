@@ -31,6 +31,8 @@ export interface CallState {
   muted: boolean;
   pushToTalk: boolean;
   endedReason: string | null;
+  /** Transient local status note (e.g. mic denied, TTS failed). */
+  note: string | null;
 }
 
 export const initialState: CallState = {
@@ -42,6 +44,7 @@ export const initialState: CallState = {
   muted: false,
   pushToTalk: false,
   endedReason: null,
+  note: null,
 };
 
 let lineSeq = 0;
@@ -61,6 +64,7 @@ export type Action =
   | { type: "user_reply"; text: string }
   | { type: "clear_pending" }
   | { type: "return_to_connected" }
+  | { type: "note"; text: string | null }
   | { type: "ended"; reason: string; farewell: string | null }
   | { type: "toggle_mute" }
   | { type: "set_ptt"; value: boolean }
@@ -87,7 +91,14 @@ export function reducer(state: CallState, action: Action): CallState {
         ...state.transcript,
         { key: nextKey(), who: "agent" as const, text: action.text },
       ];
-      return { ...state, phase: "speaking", caption: action.text, transcript, pending: action.pending };
+      return {
+        ...state,
+        phase: "speaking",
+        caption: action.text,
+        transcript,
+        pending: action.pending,
+        note: null,
+      };
     }
 
     case "speaking_done":
@@ -108,6 +119,9 @@ export function reducer(state: CallState, action: Action): CallState {
 
     case "clear_pending":
       return { ...state, pending: null };
+
+    case "note":
+      return { ...state, note: action.text };
 
     case "return_to_connected":
       // Listen finished with nothing to add (no speech / error); go back to
