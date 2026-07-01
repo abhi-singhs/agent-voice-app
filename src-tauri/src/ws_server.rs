@@ -172,6 +172,14 @@ async fn handle_request(
             reason,
             timeout_sec,
         } => {
+            // Do-not-disturb: auto-decline without ringing or revealing the app.
+            if state.dnd() {
+                let _ = out.send(ServerMessage::CallResult {
+                    id,
+                    status: CallStatus::Declined,
+                });
+                return;
+            }
             let rx = state.register_pending(id);
             // Raise the window so the user sees the ring even if it was hidden.
             reveal_main(&app);

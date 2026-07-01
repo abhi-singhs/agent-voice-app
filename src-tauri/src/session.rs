@@ -6,6 +6,7 @@
 //! the webview, and awaits the webview's reply (delivered via a Tauri command).
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -62,6 +63,8 @@ struct Inner {
 /// Shared, thread-safe session state managed by Tauri.
 pub struct SessionManager {
     token: String,
+    /// When true, incoming calls are auto-declined without ringing.
+    dnd: AtomicBool,
     inner: Mutex<Inner>,
 }
 
@@ -69,6 +72,7 @@ impl SessionManager {
     pub fn new() -> Self {
         Self {
             token: generate_token(),
+            dnd: AtomicBool::new(false),
             inner: Mutex::new(Inner::default()),
         }
     }
@@ -76,6 +80,16 @@ impl SessionManager {
     /// The shared secret a client must present in `Hello`.
     pub fn token(&self) -> &str {
         &self.token
+    }
+
+    /// Enable or disable do-not-disturb (auto-decline incoming calls).
+    pub fn set_dnd(&self, on: bool) {
+        self.dnd.store(on, Ordering::Relaxed);
+    }
+
+    /// Whether do-not-disturb is currently enabled.
+    pub fn dnd(&self) -> bool {
+        self.dnd.load(Ordering::Relaxed)
     }
 
     /// Set (or clear) the outbound channel for the active connection.

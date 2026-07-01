@@ -12,6 +12,7 @@ use voice_protocol::{AckStatus, CallStatus, ListenStatus, ServerMessage};
 
 use crate::config::{ElevenLabsConfig, VoiceConfigInfo};
 use crate::elevenlabs;
+use crate::history::{self, CallRecord};
 use crate::mcp_register::{self, McpStatus};
 use crate::session::{FrontendResponse, SessionManager};
 
@@ -98,4 +99,34 @@ pub fn register_mcp() -> Result<McpStatus, String> {
 #[tauri::command]
 pub fn unregister_mcp() -> Result<McpStatus, String> {
     mcp_register::unregister().map_err(|e| e.to_string())
+}
+
+/// Enable or disable do-not-disturb (auto-decline incoming calls).
+#[tauri::command]
+pub fn set_dnd(state: State<'_, Arc<SessionManager>>, on: bool) {
+    state.set_dnd(on);
+}
+
+/// Whether do-not-disturb is currently enabled.
+#[tauri::command]
+pub fn get_dnd(state: State<'_, Arc<SessionManager>>) -> bool {
+    state.dnd()
+}
+
+/// Persist a completed call to history.
+#[tauri::command]
+pub fn save_call(record: CallRecord) -> Result<(), String> {
+    history::save(record).map_err(|e| e.to_string())
+}
+
+/// List recent calls, newest first (optionally limited).
+#[tauri::command]
+pub fn list_calls(limit: Option<usize>) -> Result<Vec<CallRecord>, String> {
+    history::list(limit).map_err(|e| e.to_string())
+}
+
+/// Delete all saved call history.
+#[tauri::command]
+pub fn clear_calls() -> Result<(), String> {
+    history::clear().map_err(|e| e.to_string())
 }

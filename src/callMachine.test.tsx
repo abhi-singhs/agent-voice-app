@@ -9,6 +9,7 @@ const respondCall = vi.fn();
 const respondListen = vi.fn();
 const respondAck = vi.fn();
 const notifyHangup = vi.fn();
+const saveCall = vi.fn((_record: unknown) => Promise.resolve());
 const tts = vi.fn(() => Promise.resolve(new ArrayBuffer(8)));
 const stt = vi.fn(() => Promise.resolve("hello there"));
 let requestHandler: ((req: VoiceRequest) => void) | null = null;
@@ -22,6 +23,7 @@ vi.mock("./ipc", () => ({
   respondListen: (...a: unknown[]) => respondListen(...a),
   respondAck: (...a: unknown[]) => respondAck(...a),
   notifyHangup: (...a: unknown[]) => notifyHangup(...a),
+  saveCall: (...a: unknown[]) => saveCall(...(a as [unknown])),
   tts: (...a: unknown[]) => tts(...(a as [])),
   stt: (...a: unknown[]) => stt(...(a as [])),
 }));
@@ -211,5 +213,21 @@ describe("useCallMachine", () => {
     expect(respondAck).toHaveBeenCalledWith(3, "ok");
     expect(result.current.state.phase).toBe("ended");
     expect(result.current.state.transcript.at(-1)).toMatchObject({ who: "agent", text: "Bye!" });
+  });
+
+  it("saves the call to history when it ends with a transcript", async () => {
+    const { result } = await connect(1);
+    emit({ kind: "say", id: 2, text: "Hello there" });
+    await flush();
+    act(() => result.current.hangUp());
+    await flush();
+
+    expect(saveCall).toHaveBeenCalledTimes(1);
+    const record = saveCall.mock.calls[0][0] as {
+      entries: Array<{ who: string; text: string }>;
+      outcome: string | null;
+    };
+    expect(record.entries).toEqual([{ who: "agent", text: "Hello there" }]);
+    expect(record.outcome).toMatch(/ended/i);
   });
 });

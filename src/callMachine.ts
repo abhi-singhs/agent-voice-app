@@ -16,6 +16,7 @@ import {
   respondAck,
   respondCall,
   respondListen,
+  saveCall,
   stt,
   tts,
   type VoiceRequest,
@@ -47,6 +48,8 @@ export function useCallMachine(): CallController {
   const endTimer = useRef<number | null>(null);
   // The active listen turn (mic capture), if any.
   const listenRef = useRef<ListenHandle | null>(null);
+  // Epoch ms when the current call was answered (for history).
+  const callStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     pendingRef.current = state.pending;
@@ -55,15 +58,26 @@ export function useCallMachine(): CallController {
     pttRef.current = state.pushToTalk;
   }, [state.pending, state.phase, state.muted, state.pushToTalk]);
 
-  // Auto-return to idle a few seconds after a call ends.
+  // Auto-return to idle a few seconds after a call ends, and persist the
+  // transcript to history (best-effort) once per ended call.
   useEffect(() => {
     if (state.phase === "ended") {
+      if (state.transcript.length > 0) {
+        void saveCall({
+          started_at: callStartRef.current ?? Date.now(),
+          ended_at: Date.now(),
+          reason: state.reason,
+          outcome: state.endedReason,
+          entries: state.transcript.map((l) => ({ who: l.who, text: l.text })),
+        }).catch((err) => console.error("save_call failed:", err));
+      }
+      callStartRef.current = null;
       endTimer.current = window.setTimeout(() => dispatch({ type: "reset" }), 3500);
       return () => {
         if (endTimer.current !== null) clearTimeout(endTimer.current);
       };
     }
-  }, [state.phase]);
+  }, [state.phase, state.transcript, state.reason, state.endedReason]);
 
   // Speak text via TTS; resolves true on success, false if audio failed. A
   // failure is non-fatal — captions still show — but we surface a note so the
@@ -201,6 +215,7 @@ export function useCallMachine(): CallController {
 
   const answer = useCallback(() => {
     ringer.current.stop();
+    callStartRef.current = Date.now();
     const p = pendingRef.current;
     if (p?.kind === "call") void respondCall(p.id, "answered");
     dispatch({ type: "answered" });

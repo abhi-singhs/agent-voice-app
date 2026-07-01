@@ -3,6 +3,7 @@
 mod commands;
 pub mod config;
 pub mod elevenlabs;
+mod history;
 mod mcp_register;
 mod runtime;
 mod session;
@@ -83,7 +84,12 @@ pub fn run() {
             commands::stt,
             commands::mcp_status,
             commands::register_mcp,
-            commands::unregister_mcp
+            commands::unregister_mcp,
+            commands::set_dnd,
+            commands::get_dnd,
+            commands::save_call,
+            commands::list_calls,
+            commands::clear_calls
         ])
         .build(context)
         .expect("error while building tauri application")

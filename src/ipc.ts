@@ -106,3 +106,43 @@ export function registerMcp(): Promise<McpStatus> {
 export function unregisterMcp(): Promise<McpStatus> {
   return invoke("unregister_mcp");
 }
+
+/** Enable/disable do-not-disturb (auto-decline incoming calls). */
+export function setDnd(on: boolean): Promise<void> {
+  return invoke("set_dnd", { on });
+}
+
+/** Whether do-not-disturb is currently enabled. */
+export function getDnd(): Promise<boolean> {
+  return invoke("get_dnd");
+}
+
+/** One line of a saved call transcript. */
+export interface TranscriptEntry {
+  who: string;
+  text: string;
+}
+
+/** A saved call, mirrors the Rust `CallRecord`. */
+export interface CallRecord {
+  started_at: number;
+  ended_at: number;
+  reason: string | null;
+  outcome: string | null;
+  entries: TranscriptEntry[];
+}
+
+/** Persist a completed call to history. */
+export function saveCall(record: CallRecord): Promise<void> {
+  return invoke("save_call", { record });
+}
+
+/** List recent calls, newest first (optionally limited). */
+export function listCalls(limit?: number): Promise<CallRecord[]> {
+  return invoke("list_calls", { limit: limit ?? null });
+}
+
+/** Delete all saved call history. */
+export function clearCalls(): Promise<void> {
+  return invoke("clear_calls");
+}
