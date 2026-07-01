@@ -6,11 +6,64 @@
 use anyhow::{anyhow, Context, Result};
 use reqwest::multipart::{Form, Part};
 use reqwest::Client;
+use serde::Serialize;
 
 use crate::config::ElevenLabsConfig;
 
 const API_BASE: &str = "https://api.elevenlabs.io";
 const STT_MODEL: &str = "scribe_v1";
+
+/// A voice available on the account, sent to the webview for the picker.
+#[derive(Debug, Clone, Serialize)]
+pub struct VoiceSummary {
+    pub voice_id: String,
+    pub name: String,
+    pub category: Option<String>,
+}
+
+/// List the voices available to `api_key` via `GET /v1/voices`. Doubles as a
+/// validation of the key: an invalid key yields an HTTP error.
+pub async fn list_voices(client: &Client, api_key: &str) -> Result<Vec<VoiceSummary>> {
+    let url = format!("{API_BASE}/v1/voices");
+    let resp = client
+        .get(&url)
+        .header("xi-api-key", api_key)
+        .send()
+        .await
+        .context("voices request failed")?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let detail = resp.text().await.unwrap_or_default();
+        return Err(anyhow!("voices HTTP {status}: {}", detail.trim()));
+    }
+
+    let json: serde_json::Value = resp.json().await.context("parsing voices response")?;
+    let voices = json
+        .get("voices")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow!("unexpected voices response shape"))?
+        .iter()
+        .filter_map(|v| {
+            let voice_id = v.get("voice_id")?.as_str()?.to_string();
+            let name = v
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or(&voice_id)
+                .to_string();
+            let category = v
+                .get("category")
+                .and_then(|c| c.as_str())
+                .map(|s| s.to_string());
+            Some(VoiceSummary {
+                voice_id,
+                name,
+                category,
+            })
+        })
+        .collect();
+    Ok(voices)
+}
 
 /// Synthesize `text` to speech, returning encoded audio bytes (per `outputFormat`).
 pub async fn synthesize(client: &Client, cfg: &ElevenLabsConfig, text: &str) -> Result<Vec<u8>> {
