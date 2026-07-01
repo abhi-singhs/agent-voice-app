@@ -30,6 +30,8 @@ export interface CallState {
   pending: Pending;
   muted: boolean;
   pushToTalk: boolean;
+  /** Whether hands-free voice barge-in (interrupting the agent) is enabled. */
+  bargeIn: boolean;
   endedReason: string | null;
   /** Transient local status note (e.g. mic denied, TTS failed). */
   note: string | null;
@@ -43,6 +45,7 @@ export const initialState: CallState = {
   pending: null,
   muted: false,
   pushToTalk: false,
+  bargeIn: true,
   endedReason: null,
   note: null,
 };
@@ -68,6 +71,7 @@ export type Action =
   | { type: "ended"; reason: string; farewell: string | null }
   | { type: "toggle_mute" }
   | { type: "set_ptt"; value: boolean }
+  | { type: "set_barge_in"; value: boolean }
   | { type: "reset" };
 
 export function reducer(state: CallState, action: Action): CallState {
@@ -147,6 +151,9 @@ export function reducer(state: CallState, action: Action): CallState {
 
     case "set_ptt":
       return { ...state, pushToTalk: action.value };
+
+    case "set_barge_in":
+      return { ...state, bargeIn: action.value };
 
     case "reset":
       return { ...initialState };

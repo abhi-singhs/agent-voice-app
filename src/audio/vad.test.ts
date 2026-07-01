@@ -55,4 +55,33 @@ describe("Vad", () => {
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
+
+  it("waits for the onset (attack) window before firing onSpeechStart", () => {
+    const vad = new Vad({ threshold: 0.02, onsetMs: 300 });
+    const onStart = vi.fn();
+    vad.onSpeechStart = onStart;
+
+    vad.push(0.05, 0); // first buffer over threshold — starts the onset clock
+    expect(onStart).not.toHaveBeenCalled();
+    vad.push(0.05, 200); // still within the onset window
+    expect(onStart).not.toHaveBeenCalled();
+    vad.push(0.05, 350); // sustained past onsetMs → fires
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(vad.hasSpoken).toBe(true);
+  });
+
+  it("resets the onset window if the level dips below threshold (echo blips)", () => {
+    const vad = new Vad({ threshold: 0.02, onsetMs: 300 });
+    const onStart = vi.fn();
+    vad.onSpeechStart = onStart;
+
+    vad.push(0.05, 0); // blip starts onset clock
+    vad.push(0.0, 100); // drops out → onset candidate reset
+    vad.push(0.05, 200); // new onset clock starts here
+    expect(onStart).not.toHaveBeenCalled();
+    vad.push(0.05, 400); // only 200ms sustained since restart → still quiet
+    expect(onStart).not.toHaveBeenCalled();
+    vad.push(0.05, 550); // now 350ms since restart → fires
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
 });

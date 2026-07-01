@@ -51,7 +51,11 @@ async function playViaElement(data: ArrayBuffer): Promise<void> {
   currentAudioEl = el;
   try {
     await new Promise<void>((resolve, reject) => {
-      el.onended = () => resolve();
+      // Resolve on natural end *or* on pause, so stopPlayback() (which pauses)
+      // lets the awaiting speak() promise settle for barge-in / hang-up.
+      const done = () => resolve();
+      el.onended = done;
+      el.onpause = done;
       el.onerror = () => reject(el.error ?? new Error("audio element error"));
       void el.play().catch(reject);
     });

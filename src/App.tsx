@@ -13,6 +13,8 @@ function App() {
     sendReply,
     toggleMute,
     setPushToTalk,
+    setBargeIn,
+    interrupt,
     startTalking,
     stopTalking,
   } = useCallMachine();
@@ -34,6 +36,8 @@ function App() {
           onSendReply={sendReply}
           onToggleMute={toggleMute}
           onSetPushToTalk={setPushToTalk}
+          onSetBargeIn={setBargeIn}
+          onInterrupt={interrupt}
           onStartTalking={startTalking}
           onStopTalking={stopTalking}
           onHangUp={hangUp}

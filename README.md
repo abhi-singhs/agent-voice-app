@@ -175,12 +175,20 @@ pnpm sidecar --debug      # debug (for dev)
 1. The agent invokes `call_user` → the app rings (window raises, OS notification,
    ringtone) → **Answer** or **Decline**.
 2. The agent speaks (`say_and_listen`): you hear the voice and see captions.
-3. It listens for your reply — hands-free via **voice activity detection**
+3. **Interrupt anytime** — you don't have to wait for the agent to finish:
+   - **Just start talking.** Hands-free **barge-in** is on by default: the app
+     listens while the agent speaks and, the moment you begin, cuts off its voice
+     and captures your reply. Toggle it off with the 🗣️ **Barge-in** control if
+     speaker echo false-triggers it (then use the button below instead).
+   - **Tap ✋ Interrupt** (or press **Esc**) while the agent is speaking to cut it
+     off. For `say_and_listen` this hands you the turn; for a one-way announcement
+     it just silences the audio.
+4. It listens for your reply — hands-free via **voice activity detection**
    (silence ends your turn) or hold the **push-to-talk** button. Your speech is
    transcribed and returned to the agent.
-4. **Mute**, **push-to-talk**, or **hang up** anytime. If the mic is unavailable,
-   a note appears and you can type your reply as a fallback.
-5. The agent ends with `end_call` (optional spoken farewell).
+5. **Mute**, **push-to-talk**, **barge-in**, or **hang up** anytime. If the mic is
+   unavailable, a note appears and you can type your reply as a fallback.
+6. The agent ends with `end_call` (optional spoken farewell).
 
 ---
 
@@ -234,7 +242,13 @@ node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool dire
 ## Notes & limits
 
 - Free-tier ElevenLabs credits are limited; each turn spends TTS + STT credits.
-- Batch STT per turn adds ~0.5–1.5s latency; acceptable for v1. Streaming and
-  barge-in (interrupting the agent) are planned for v2.
+- Batch STT per turn adds ~0.5–1.5s latency; acceptable for v1. Streaming STT is
+  planned for v2.
+- **Barge-in** (interrupting the agent mid-sentence) is supported — hands-free by
+  default, plus a manual ✋ Interrupt button / Esc key. It runs entirely in the
+  webview; the agent is unaware it was cut off (it just receives your reply, or its
+  usual ack for a one-way announcement). Because the mic is open while the agent
+  speaks, loud speaker echo can occasionally false-trigger hands-free barge-in
+  despite echo cancellation — toggle it off if that happens.
 - If two Copilot sessions call at once, the app currently handles one call at a
   time; multi-session queueing is a future enhancement.

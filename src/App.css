@@ -330,6 +330,30 @@ body {
   filter: brightness(1.15);
 }
 
+.interrupt {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 14px;
+  border: 1px solid #f5a623;
+  border-radius: 12px;
+  background: rgba(245, 166, 35, 0.14);
+  color: #ffcf72;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.08s ease, filter 0.12s ease, background 0.12s ease;
+}
+
+.interrupt:hover {
+  background: rgba(245, 166, 35, 0.22);
+}
+
+.interrupt:active {
+  transform: scale(0.98);
+  filter: brightness(1.1);
+}
+
 .reply--active {
   opacity: 1;
 }

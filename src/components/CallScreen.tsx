@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { CallState } from "../callMachine";
 import { Controls } from "./Controls";
@@ -9,6 +9,8 @@ interface Props {
   onSendReply: (text: string) => void;
   onToggleMute: () => void;
   onSetPushToTalk: (value: boolean) => void;
+  onSetBargeIn: (value: boolean) => void;
+  onInterrupt: () => void;
   onStartTalking: () => void;
   onStopTalking: () => void;
   onHangUp: () => void;
@@ -32,14 +34,30 @@ export function CallScreen({
   onSendReply,
   onToggleMute,
   onSetPushToTalk,
+  onSetBargeIn,
+  onInterrupt,
   onStartTalking,
   onStopTalking,
   onHangUp,
 }: Props) {
   const [draft, setDraft] = useState("");
+  const speaking = state.phase === "speaking";
   const listening = state.phase === "listening";
   const ended = state.phase === "ended";
   const showPushToTalk = listening && state.pushToTalk && !state.muted;
+
+  // Press Escape to cut the agent off while it's speaking.
+  useEffect(() => {
+    if (!speaking) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onInterrupt();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [speaking, onInterrupt]);
 
   const submit = () => {
     if (!draft.trim()) return;
@@ -63,6 +81,12 @@ export function CallScreen({
       )}
 
       <Transcript lines={state.transcript} />
+
+      {speaking && (
+        <button type="button" className="interrupt" onClick={onInterrupt}>
+          ✋ Interrupt
+        </button>
+      )}
 
       {showPushToTalk && (
         <button
@@ -105,8 +129,10 @@ export function CallScreen({
         <Controls
           muted={state.muted}
           pushToTalk={state.pushToTalk}
+          bargeIn={state.bargeIn}
           onToggleMute={onToggleMute}
           onSetPushToTalk={onSetPushToTalk}
+          onSetBargeIn={onSetBargeIn}
           onHangUp={onHangUp}
         />
       )}

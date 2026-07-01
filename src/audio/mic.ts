@@ -66,6 +66,15 @@ export class Recorder {
     this._started = true;
   }
 
+  /**
+   * Discard all but the last `ms` of captured audio, keeping the ScriptProcessor
+   * running. Used at barge-in to drop the agent's TTS echo captured while it was
+   * speaking, retaining a short pre-roll so the user's utterance onset survives.
+   */
+  keepLastMs(ms: number): void {
+    this.chunks = trimToLastMs(this.chunks, this.srcRate, ms);
+  }
+
   /** Stop capturing and return the encoded WAV, or null if nothing was captured. */
   stop(): Recording | null {
     if (!this._started) return null;
@@ -101,6 +110,29 @@ function mergeChunks(chunks: Float32Array[]): Float32Array {
     offset += c.length;
   }
   return out;
+}
+
+/**
+ * Return a suffix of `chunks` holding roughly the last `ms` of audio at
+ * `sampleRate`. Whole buffers are kept from the end until the sample budget is
+ * met (so we never split a buffer). Pure and side-effect free for testability.
+ */
+export function trimToLastMs(
+  chunks: Float32Array[],
+  sampleRate: number,
+  ms: number,
+): Float32Array[] {
+  if (ms <= 0) return [];
+  const budget = Math.floor((ms / 1000) * sampleRate);
+  if (budget <= 0) return [];
+  const kept: Float32Array[] = [];
+  let count = 0;
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    kept.unshift(chunks[i]);
+    count += chunks[i].length;
+    if (count >= budget) break;
+  }
+  return kept;
 }
 
 /** Linear-interpolation downsample from srcRate to dstRate. */
