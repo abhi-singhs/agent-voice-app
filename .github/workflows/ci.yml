@@ -74,6 +74,11 @@ jobs:
         with:
           key: ${{ matrix.platform }}
 
+      - name: Stage MCP sidecar
+        run: |
+          cargo build -p voice-mcp-server --locked
+          node scripts/prepare-sidecar.mjs --debug --no-build
+
       - name: Build workspace
         run: cargo build --workspace --locked
 
