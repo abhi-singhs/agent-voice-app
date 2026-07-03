@@ -19,7 +19,7 @@ export function RingScreen({ reason, onAnswer, onDecline }: Props) {
 
       <div className="ring-actions">
         <button type="button" className="round-btn round-btn--decline" onClick={onDecline}>
-          <span className="round-btn__icon">✕</span>
+          <span className="round-btn__icon">📞</span>
           <span className="round-btn__label">Decline</span>
         </button>
         <button type="button" className="round-btn round-btn--answer" onClick={onAnswer}>
