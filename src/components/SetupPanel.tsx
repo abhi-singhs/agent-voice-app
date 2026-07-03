@@ -290,7 +290,7 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
               </div>
               <p className="setup-muted setup-hint">
                 Your key is stored locally in{" "}
-                <code>~/.copilot/elevenlabs/config.json</code> and never leaves the app
+                <code>~/.agent-voice-app/elevenlabs/config.json</code> and never leaves the app
                 except to ElevenLabs.
               </p>
             </div>

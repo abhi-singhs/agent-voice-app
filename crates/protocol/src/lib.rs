@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 /// The protocol version negotiated between the app and the MCP server.
 pub const PROTOCOL_VERSION: u32 = 1;
 
-/// Relative path (under the user's `.copilot` dir) of the runtime-discovery file.
-pub const RUNTIME_REL_PATH: &str = ".copilot/voice-call/runtime.json";
+/// Relative path (under the user's home dir) of the runtime-discovery file.
+pub const RUNTIME_REL_PATH: &str = ".agent-voice-app/voice-call/runtime.json";
 
 fn default_true() -> bool {
     true

@@ -1,5 +1,5 @@
 //! Loads and saves the ElevenLabs configuration at
-//! `~/.copilot/elevenlabs/config.json`. The API key stays in the backend and is
+//! `~/.agent-voice-app/elevenlabs/config.json`. The API key stays in the backend and is
 //! never sent to the webview. The Setup panel writes this file via [`ElevenLabsConfig::save`].
 
 use std::path::{Path, PathBuf};
@@ -7,7 +7,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
-const CONFIG_REL_PATH: &str = ".copilot/elevenlabs/config.json";
 /// Premade "George" voice — a sensible default so a fresh setup can call right away.
 const DEFAULT_VOICE_ID: &str = "JBFqnCBsd6RMkjVDRZzb";
 
@@ -74,10 +73,11 @@ pub struct VoiceConfigInfo {
 }
 
 impl ElevenLabsConfig {
-    /// Absolute path to the config file (`~/.copilot/elevenlabs/config.json`).
+    /// Absolute path to the config file (`~/.agent-voice-app/elevenlabs/config.json`).
     pub fn path() -> Result<PathBuf> {
-        let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
-        Ok(home.join(CONFIG_REL_PATH))
+        Ok(crate::paths::app_data_dir()?
+            .join("elevenlabs")
+            .join("config.json"))
     }
 
     /// Strict load used by TTS/STT: errors if the file is missing or the key /
@@ -118,7 +118,7 @@ impl ElevenLabsConfig {
         }
     }
 
-    /// Persist the config to `~/.copilot/elevenlabs/config.json` (owner-only).
+    /// Persist the config to `~/.agent-voice-app/elevenlabs/config.json` (owner-only).
     pub fn save(&self) -> Result<()> {
         self.save_to(&Self::path()?)
     }

@@ -8,6 +8,7 @@ pub mod local_stt;
 pub mod local_tts;
 mod mcp_register;
 pub mod models;
+pub mod paths;
 mod runtime;
 mod session;
 pub mod voice_settings;
@@ -43,6 +44,10 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // Remove stale app data from the old ~/.copilot location (no
+            // migration); the app now stores everything under its own folder.
+            paths::cleanup_legacy_copilot_data();
+
             let state = Arc::new(SessionManager::new());
             app.manage(state.clone());
             // Shared HTTP client for ElevenLabs (connection reuse).

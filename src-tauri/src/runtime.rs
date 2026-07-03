@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Context};
 use voice_protocol::{RuntimeInfo, PROTOCOL_VERSION, RUNTIME_REL_PATH};
 
-/// Absolute path to the runtime-discovery file (`~/.copilot/voice-call/runtime.json`).
+/// Absolute path to the runtime-discovery file (`~/.agent-voice-app/voice-call/runtime.json`).
 pub fn path() -> anyhow::Result<PathBuf> {
     let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
     Ok(home.join(RUNTIME_REL_PATH))

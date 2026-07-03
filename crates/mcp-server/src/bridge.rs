@@ -2,7 +2,7 @@
 //!
 //! Maintains a single persistent connection for the lifetime of a call so the
 //! app can correlate multiple turns and push spontaneous events (user hangup).
-//! Reads `~/.copilot/voice-call/runtime.json` for the port + token; any failure
+//! Reads `~/.agent-voice-app/voice-call/runtime.json` for the port + token; any failure
 //! to connect is surfaced to callers so tools can fall back (e.g. `no_device`).
 
 use std::collections::HashMap;

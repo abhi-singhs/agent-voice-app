@@ -1,6 +1,6 @@
 //! Real end-to-end smoke test for the local voice engine.
 //!
-//! Downloads the default TTS + STT bundles into `~/.copilot/voice-models/`,
+//! Downloads the default TTS + STT bundles into `~/.agent-voice-app/voice-models/`,
 //! synthesizes speech with Kokoro, then transcribes that audio back with
 //! Parakeet — exercising the whole local path (download → extract → resolve →
 //! CoreML/CPU inference → WAV encode/decode) outside Tauri.
@@ -25,7 +25,7 @@ fn progress(p: models::ModelProgress) {
 async fn main() -> anyhow::Result<()> {
     let client = reqwest::Client::new();
 
-    let tts_id = "kokoro-int8-multi-lang-v1_0";
+    let tts_id = "kokoro-multi-lang-v1_0";
     let stt_id = "parakeet-tdt-0.6b-v2-int8";
     let sentence = "Hello from the local Kokoro model running on this MacBook Air.";
 
