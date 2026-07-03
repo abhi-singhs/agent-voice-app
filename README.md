@@ -14,6 +14,66 @@ switch to [ElevenLabs](https://elevenlabs.io) for the voice at any time.
 
 ---
 
+## Install
+
+Download the installer for your platform from the
+[**Releases**](https://github.com/abhi-singhs/agent-voice-app/releases) page.
+
+### macOS via Homebrew (recommended, Apple Silicon)
+
+The cleanest way to install on an Apple-Silicon Mac — the cask handles the
+quarantine flag for you, so you never see the "damaged" dialog:
+
+```bash
+brew tap abhi-singhs/tap
+brew install --cask agent-voice-app
+```
+
+Upgrade later with `brew upgrade --cask agent-voice-app`, uninstall with
+`brew uninstall --cask agent-voice-app` (add `--zap` to also remove
+`~/.agent-voice-app`). Intel Macs aren't covered yet (only an `aarch64` DMG is
+published); use the manual download below.
+
+> Maintainer setup: the cask lives in a personal tap. See
+> [`packaging/homebrew/`](packaging/homebrew/) and the
+> `Update Homebrew cask` workflow — it needs a `homebrew-tap` repo and a
+> `HOMEBREW_TAP_TOKEN` secret.
+
+### macOS: "Agent Voice App.app is damaged and can't be opened"
+
+If you downloaded the `.dmg`/`.app` directly (not via Homebrew), you may hit this.
+macOS release builds are **unsigned** (no paid Apple Developer ID / notarization).
+When you download an unsigned `.app` through a browser, Gatekeeper attaches a
+`com.apple.quarantine` flag and — on Apple Silicon — shows a misleading
+**"damaged and can't be opened"** dialog. The app is **not** actually damaged;
+you just need to clear the quarantine flag once. Pick whichever is easiest:
+
+- **Terminal (fastest).** Clear the quarantine attribute, then open normally:
+
+  ```bash
+  xattr -cr "/Applications/Agent Voice App.app"
+  ```
+
+  (Adjust the path if the app lives elsewhere. `xattr -dr com.apple.quarantine "…"`
+  works too.)
+
+- **No Terminal.** In **Finder**, right-click (or Control-click) the app →
+  **Open** → **Open** again in the prompt. On recent macOS the button instead
+  appears in **System Settings → Privacy & Security → "Open Anyway"** right after
+  you try to launch it. You only do this on the first launch.
+
+Once opened (or de-quarantined) once, it launches normally forever after.
+
+> Want zero prompts for everyone? That requires paid Apple Developer signing +
+> notarization, which this project's Release workflow intentionally skips.
+
+### Windows
+
+SmartScreen may warn about an unrecognized publisher (the build is unsigned).
+Click **More info → Run anyway**.
+
+---
+
 ## How it works
 
 ```
@@ -292,6 +352,10 @@ node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool dire
 
 ## Troubleshooting
 
+- **macOS "…is damaged and can't be opened":** not real corruption — it's
+  Gatekeeper quarantining an unsigned download. Run
+  `xattr -cr "/Applications/Agent Voice App.app"`, or right-click the app →
+  **Open**. See [Install](#install) for details.
 - **Agent says "no device":** the app isn't running, or the MCP server can't reach
   it. Launch the app and confirm the Setup panel shows *Registered* for the
   client you are using. Delete a
