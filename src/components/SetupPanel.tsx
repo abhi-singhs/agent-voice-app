@@ -13,6 +13,7 @@ import {
   type VoiceConfigInfo,
   type VoiceSummary,
 } from "../ipc";
+import { VoiceEngineCard } from "./VoiceEngineCard";
 
 /**
  * First-run / settings panel shown from the idle screen. Surfaces the two
@@ -184,6 +185,9 @@ export function SetupPanel({ onClose }: { onClose: () => void }) {
       </header>
 
       <div className="setup-body">
+        {/* Voice engine (local vs ElevenLabs) */}
+        <VoiceEngineCard />
+
         {/* ElevenLabs voice */}
         <div className="setup-card">
           <div className="setup-card__head">

@@ -4,9 +4,13 @@ mod commands;
 pub mod config;
 pub mod elevenlabs;
 mod history;
+pub mod local_stt;
+pub mod local_tts;
 mod mcp_register;
+pub mod models;
 mod runtime;
 mod session;
+pub mod voice_settings;
 mod ws_server;
 
 use std::sync::Arc;
@@ -84,6 +88,14 @@ pub fn run() {
             commands::save_voice_config,
             commands::tts,
             commands::stt,
+            commands::voice_settings,
+            commands::set_stt_provider,
+            commands::set_tts_provider,
+            commands::set_local_voice,
+            commands::list_local_voices,
+            commands::model_status,
+            commands::download_model,
+            commands::delete_model,
             commands::mcp_clients,
             commands::mcp_status,
             commands::register_mcp,

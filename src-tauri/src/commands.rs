@@ -13,8 +13,12 @@ use voice_protocol::{AckStatus, CallStatus, ListenStatus, ServerMessage};
 use crate::config::{ElevenLabsConfig, VoiceConfigInfo};
 use crate::elevenlabs;
 use crate::history::{self, CallRecord};
+use crate::local_stt;
+use crate::local_tts;
 use crate::mcp_register::{self, McpClientInfo, McpStatus};
+use crate::models;
 use crate::session::{FrontendResponse, SessionManager};
+use crate::voice_settings::{Provider, VoiceSettings};
 
 /// Reply to an `IncomingCall` request (answered / declined / timeout).
 #[tauri::command]
@@ -118,15 +122,43 @@ pub fn save_voice_config(
     Ok(cfg.info())
 }
 
-/// Synthesize speech for `text`; returns raw audio bytes (mp3) to the webview.
+/// Synthesize speech for `text`; returns raw audio bytes to the webview
+/// (WAV for the local engine, mp3 for ElevenLabs — the player sniffs both).
 #[tauri::command]
 pub async fn tts(client: State<'_, Client>, text: String) -> Result<Response, String> {
-    let cfg = ElevenLabsConfig::load().map_err(|e| e.to_string())?;
-    let bytes = elevenlabs::synthesize(&client, &cfg, &text)
-        .await
-        .map_err(|e| e.to_string())?;
-    eprintln!("voice-call: tts {} chars -> {} bytes", text.len(), bytes.len());
-    Ok(Response::new(bytes))
+    let settings = VoiceSettings::load();
+    match settings.tts_provider {
+        Provider::Local => {
+            let model_id = settings.local.tts_model.clone();
+            let sid = settings.local.tts_voice_sid;
+            let speed = settings.local.speed;
+            let text_for_log_len = text.len();
+            let bytes = tokio::task::spawn_blocking(move || {
+                local_tts::synthesize(&model_id, &text, sid, speed)
+            })
+            .await
+            .map_err(|e| format!("tts task failed: {e}"))?
+            .map_err(|e| e.to_string())?;
+            eprintln!(
+                "voice-call: tts(local) {} chars -> {} bytes",
+                text_for_log_len,
+                bytes.len()
+            );
+            Ok(Response::new(bytes))
+        }
+        Provider::Elevenlabs => {
+            let cfg = ElevenLabsConfig::load().map_err(|e| e.to_string())?;
+            let bytes = elevenlabs::synthesize(&client, &cfg, &text)
+                .await
+                .map_err(|e| e.to_string())?;
+            eprintln!(
+                "voice-call: tts(elevenlabs) {} chars -> {} bytes",
+                text.len(),
+                bytes.len()
+            );
+            Ok(Response::new(bytes))
+        }
+    }
 }
 
 /// Transcribe base64-encoded audio; returns the recognized text.
@@ -140,12 +172,102 @@ pub async fn stt(
     let bytes = STANDARD
         .decode(audio.as_bytes())
         .map_err(|e| format!("invalid base64 audio: {e}"))?;
-    let cfg = ElevenLabsConfig::load().map_err(|e| e.to_string())?;
-    let text = elevenlabs::transcribe(&client, &cfg, bytes, &mime, &filename)
+    let settings = VoiceSettings::load();
+    match settings.stt_provider {
+        Provider::Local => {
+            let model_id = settings.local.stt_model.clone();
+            let byte_len = bytes.len();
+            let text = tokio::task::spawn_blocking(move || {
+                local_stt::transcribe(&model_id, &bytes)
+            })
+            .await
+            .map_err(|e| format!("stt task failed: {e}"))?
+            .map_err(|e| e.to_string())?;
+            eprintln!("voice-call: stt(local) {byte_len} bytes -> {text:?}");
+            Ok(text)
+        }
+        Provider::Elevenlabs => {
+            let cfg = ElevenLabsConfig::load().map_err(|e| e.to_string())?;
+            let text = elevenlabs::transcribe(&client, &cfg, bytes, &mime, &filename)
+                .await
+                .map_err(|e| e.to_string())?;
+            eprintln!("voice-call: stt(elevenlabs) {} bytes -> {text:?}", audio.len());
+            Ok(text)
+        }
+    }
+}
+
+/// Return the current voice-engine settings (providers + local prefs).
+#[tauri::command]
+pub fn voice_settings() -> VoiceSettings {
+    VoiceSettings::load()
+}
+
+/// Switch the speech-to-text provider (local ⟷ elevenlabs).
+#[tauri::command]
+pub fn set_stt_provider(provider: Provider) -> Result<VoiceSettings, String> {
+    let mut s = VoiceSettings::load();
+    s.stt_provider = provider;
+    s.save().map_err(|e| e.to_string())?;
+    Ok(s)
+}
+
+/// Switch the text-to-speech provider (local ⟷ elevenlabs).
+#[tauri::command]
+pub fn set_tts_provider(provider: Provider) -> Result<VoiceSettings, String> {
+    let mut s = VoiceSettings::load();
+    s.tts_provider = provider;
+    s.save().map_err(|e| e.to_string())?;
+    Ok(s)
+}
+
+/// Update the local TTS voice (Kokoro speaker id) and/or speaking rate.
+#[tauri::command]
+pub fn set_local_voice(sid: Option<i32>, speed: Option<f32>) -> Result<VoiceSettings, String> {
+    let mut s = VoiceSettings::load();
+    if let Some(sid) = sid {
+        s.local.tts_voice_sid = sid;
+    }
+    if let Some(speed) = speed {
+        s.local.speed = speed.clamp(0.5, 2.0);
+    }
+    s.save().map_err(|e| e.to_string())?;
+    Ok(s)
+}
+
+/// List the selectable local TTS voices for the configured model.
+#[tauri::command]
+pub fn list_local_voices() -> Result<Vec<local_tts::VoiceInfo>, String> {
+    let s = VoiceSettings::load();
+    local_tts::list_voices(&s.local.tts_model).map_err(|e| e.to_string())
+}
+
+/// Report install status of every known local model.
+#[tauri::command]
+pub fn model_status() -> Vec<models::ModelStatus> {
+    models::all_status()
+}
+
+/// Download (and extract) a local model, emitting `voice://model-progress`.
+#[tauri::command]
+pub async fn download_model(
+    app: tauri::AppHandle,
+    client: State<'_, Client>,
+    id: String,
+) -> Result<(), String> {
+    let client = client.inner().clone();
+    models::download(&app, &client, &id)
         .await
-        .map_err(|e| e.to_string())?;
-    eprintln!("voice-call: stt {} bytes -> {:?}", audio.len(), text);
-    Ok(text)
+        .map_err(|e| e.to_string())
+}
+
+/// Delete a downloaded local model and drop any cached engine using it.
+#[tauri::command]
+pub fn delete_model(id: String) -> Result<Vec<models::ModelStatus>, String> {
+    models::delete(&id).map_err(|e| e.to_string())?;
+    local_stt::clear_cache();
+    local_tts::clear_cache();
+    Ok(models::all_status())
 }
 
 /// List clients that can receive the bundled MCP server config.

@@ -2,12 +2,15 @@
 
 A cross-platform desktop **phone for your coding agent**. The agent *calls* you
 through an MCP server; you answer in the app and have a natural, spoken
-back-and-forth. [ElevenLabs](https://elevenlabs.io) provides the agent's voice
-(text-to-speech) and transcribes your replies (speech-to-text).
+back-and-forth. By default the voice runs **fully on-device** — free, private,
+and offline — using [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+(NeMo **Parakeet** for speech-to-text, **Kokoro** for text-to-speech). You can
+switch to [ElevenLabs](https://elevenlabs.io) for the voice at any time.
 
 > Built with **Tauri v2** (Rust backend + React/TypeScript webview) and a **Rust
-> MCP server** (`rmcp`). Your ElevenLabs API key stays in the Rust backend and
-> your audio never leaves your machine except to ElevenLabs.
+> MCP server** (`rmcp`). With the default local engine your audio never leaves
+> your machine at all; if you switch to ElevenLabs, your API key stays in the
+> Rust backend and audio is sent only to ElevenLabs.
 
 ---
 
@@ -26,14 +29,20 @@ crates/mcp-server  ──WS client (127.0.0.1 + token)──►  src-tauri WS se
                                                       • TTS playback
                                                               │ invoke(bytes)
                                                               ▼
-                                                     src-tauri/elevenlabs.rs (reqwest)
-                                                     • TTS /v1/text-to-speech/{voiceId}
-                                                     • STT /v1/speech-to-text (scribe_v1)
-                                                              │ HTTPS
-                                                              ▼
-                                                          ElevenLabs
+                                                   src-tauri: provider dispatch
+                                          ┌───────────────────┴───────────────────┐
+                                          ▼                                         ▼
+                              local_tts.rs / local_stt.rs              src-tauri/elevenlabs.rs
+                              sherpa-onnx (Kokoro + Parakeet)          • TTS /v1/text-to-speech
+                              • runs on-device (CPU/CoreML)            • STT /v1/speech-to-text
+                                          │                                         │ HTTPS
+                                          ▼                                         ▼
+                              ~/.copilot/voice-models/                        ElevenLabs
 ```
 
+- The **voice engine** is selectable per direction (STT and TTS). The default is
+  **local** (sherpa-onnx); **ElevenLabs** is opt-in. Settings live in
+  `~/.copilot/voice/config.json`.
 - The **desktop app** is always-on (lives in the tray/menu bar) and owns the
   hardware — microphone and speaker. It runs a loopback WebSocket server.
 - The **MCP server** is ephemeral: the agent client spawns it per session. It is
@@ -65,18 +74,36 @@ Typical flow: `call_user` → (user answers) → one or more `say_and_listen` tu
 - **Rust** (stable) + **Cargo**, **Node** 20+, and **pnpm**.
 - An MCP-capable agent client. In-app registration supports Copilot CLI, Claude
   Code, Codex CLI, and OpenCode.
-- An **ElevenLabs** account + API key (free tier is enough: TTS, STT via
-  `scribe_v1`, and premade voices all work).
+- **Optional:** an **ElevenLabs** account + API key — only needed if you switch
+  the voice engine to ElevenLabs instead of the default local models (free tier
+  is enough: TTS, STT via `scribe_v1`, and premade voices all work).
 
-### ElevenLabs config
+### Voice engine (local vs ElevenLabs)
 
-The easiest way is **in the app**: open **Setup & status** (gear icon on the
-idle screen), click **Set up** under *ElevenLabs voice*, paste your API key,
-**Fetch voices**, pick one, and **Save**. The app writes
-`~/.copilot/elevenlabs/config.json` for you (owner-only) and picks it up on the
-next call — no restart needed. Fetching voices also validates the key. Later,
-click **Change** to switch voice (no need to re-enter the key) or paste a new
-key.
+The app ships **local-first**. On first run, open **Setup & status** (gear icon)
+→ **Voice engine** and click **Download** to fetch the default models into
+`~/.copilot/voice-models/` (a one-time ~615 MB total):
+
+| Direction | Default model | Bundle | Download |
+| --- | --- | --- | --- |
+| Speech-to-text | NeMo Parakeet TDT 0.6b v2 (int8, English) | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8` | ~483 MB |
+| Text-to-speech | Kokoro-82M v1.0 (int8, multi-lang, 50+ voices) | `kokoro-int8-multi-lang-v1_0` | ~132 MB |
+
+After downloading, everything runs on-device (no account, no network, no
+per-use cost). The models run on CPU and use Apple's CoreML when the underlying
+ONNX Runtime build supports it. In the same card you can pick the local **voice**
+and **speaking speed**, or flip either direction to **ElevenLabs**. Your choice
+is saved to `~/.copilot/voice/config.json`.
+
+### ElevenLabs config (optional)
+
+Only needed if you switch the voice engine to ElevenLabs. The easiest way is
+**in the app**: open **Setup & status** (gear icon on the idle screen), click
+**Set up** under *ElevenLabs voice*, paste your API key, **Fetch voices**, pick
+one, and **Save**. The app writes `~/.copilot/elevenlabs/config.json` for you
+(owner-only) and picks it up on the next call — no restart needed. Fetching
+voices also validates the key. Later, click **Change** to switch voice (no need
+to re-enter the key) or paste a new key.
 
 Prefer to do it by hand? Create `~/.copilot/elevenlabs/config.json`:
 
@@ -213,9 +240,11 @@ Cargo.toml                    # cargo workspace
 src/                          # React webview
   App.tsx, callMachine.ts, callReducer.ts, ipc.ts
   audio/{mic,vad,player,listen}.ts
-  components/{IdleScreen,RingScreen,CallScreen,SetupPanel}.tsx
+  components/{IdleScreen,RingScreen,CallScreen,SetupPanel,VoiceEngineCard}.tsx
 src-tauri/                    # Tauri backend (Rust)
   src/{lib,ws_server,elevenlabs,config,session,commands,mcp_register,runtime}.rs
+  src/{voice_settings,models,local_stt,local_tts}.rs   # local (sherpa-onnx) voice engine
+  examples/{voice_probe,local_smoke}.rs                # live round-trip smoke tests
   tauri.conf.json, Info.plist, capabilities/
 crates/
   protocol/                   # shared WS wire protocol (serde)
@@ -233,6 +262,7 @@ scripts/
 ```bash
 pnpm test                                  # frontend (Vitest)
 cargo test                                 # Rust unit tests
+cargo run -p agent-voice-app --example local_smoke  # local Kokoro TTS→Parakeet STT (downloads models)
 cargo run -p agent-voice-app --example voice_probe   # live ElevenLabs TTS→STT round-trip
 node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool directly
 ```
@@ -256,7 +286,10 @@ node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool dire
 
 ## Notes & limits
 
-- Free-tier ElevenLabs credits are limited; each turn spends TTS + STT credits.
+- The default **local** engine is free and runs offline — no per-turn cost. On
+  first use you download ~615 MB of models once.
+- If you switch to **ElevenLabs**, free-tier credits are limited; each turn then
+  spends TTS + STT credits.
 - Batch STT per turn adds ~0.5–1.5s latency; acceptable for v1. Streaming STT is
   planned for v2.
 - **Barge-in** (interrupting the agent mid-sentence) is supported — hands-free by
