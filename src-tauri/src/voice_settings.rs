@@ -1,19 +1,17 @@
 //! Voice engine settings: which provider powers speech-to-text and
 //! text-to-speech, plus the local-model preferences.
 //!
-//! Persisted at `~/.copilot/voice/config.json`. Local models are the default so
+//! Persisted at `~/.agent-voice-app/voice/config.json`. Local models are the default so
 //! a fresh install works offline and free; ElevenLabs is opt-in (its API key
-//! still lives in `~/.copilot/elevenlabs/config.json`, see [`crate::config`]).
+//! still lives in `~/.agent-voice-app/elevenlabs/config.json`, see [`crate::config`]).
 //!
 //! There are no secrets in this file, so the whole struct is safe to expose to
 //! the webview.
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-
-const CONFIG_REL_PATH: &str = ".copilot/voice/config.json";
 
 /// Which backend powers a given direction (STT or TTS).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -53,7 +51,7 @@ fn default_stt_model() -> String {
     "parakeet-tdt-0.6b-v2-int8".to_string()
 }
 fn default_tts_model() -> String {
-    "kokoro-int8-multi-lang-v1_0".to_string()
+    "kokoro-multi-lang-v1_0".to_string()
 }
 fn default_voice_sid() -> i32 {
     26 // bm_george (British male) in kokoro-multi-lang-v1_0
@@ -95,10 +93,11 @@ impl Default for VoiceSettings {
 }
 
 impl VoiceSettings {
-    /// Absolute path to the settings file (`~/.copilot/voice/config.json`).
+    /// Absolute path to the settings file (`~/.agent-voice-app/voice/config.json`).
     pub fn path() -> Result<PathBuf> {
-        let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
-        Ok(home.join(CONFIG_REL_PATH))
+        Ok(crate::paths::app_data_dir()?
+            .join("voice")
+            .join("config.json"))
     }
 
     /// Load settings, falling back to defaults (local-first) when the file is
@@ -113,12 +112,31 @@ impl VoiceSettings {
 
     fn load_from(path: &Path) -> Self {
         match std::fs::read(path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
+            Ok(bytes) => serde_json::from_slice::<Self>(&bytes)
+                .map(Self::repaired)
+                .unwrap_or_default(),
             Err(_) => Self::default(),
         }
     }
 
-    /// Persist the settings to `~/.copilot/voice/config.json`.
+    /// Repair stale local model ids so audio keeps working after the catalog
+    /// changes. A config pinned to a retired bundle (e.g. the old int8 Kokoro
+    /// TTS model) would otherwise fail synthesis with "unknown TTS model"; reset
+    /// any id the catalog no longer knows back to the current default.
+    fn repaired(mut self) -> Self {
+        let known = |id: &str, kind: crate::models::ModelKind| {
+            crate::models::spec(id).map(|s| s.kind == kind).unwrap_or(false)
+        };
+        if !known(&self.local.tts_model, crate::models::ModelKind::Tts) {
+            self.local.tts_model = default_tts_model();
+        }
+        if !known(&self.local.stt_model, crate::models::ModelKind::Stt) {
+            self.local.stt_model = default_stt_model();
+        }
+        self
+    }
+
+    /// Persist the settings to `~/.agent-voice-app/voice/config.json`.
     pub fn save(&self) -> Result<()> {
         self.save_to(&Self::path()?)
     }
@@ -155,7 +173,7 @@ mod tests {
         assert_eq!(s.stt_provider, Provider::Local);
         assert_eq!(s.tts_provider, Provider::Local);
         assert_eq!(s.local.stt_model, "parakeet-tdt-0.6b-v2-int8");
-        assert_eq!(s.local.tts_model, "kokoro-int8-multi-lang-v1_0");
+        assert_eq!(s.local.tts_model, "kokoro-multi-lang-v1_0");
         assert_eq!(s.local.tts_voice_sid, 26);
         assert_eq!(s.local.speed, 1.0);
     }
@@ -200,5 +218,35 @@ mod tests {
         assert_eq!(s.stt_provider, Provider::Local);
         assert_eq!(s.tts_provider, Provider::Elevenlabs);
         assert_eq!(s.local.stt_model, "parakeet-tdt-0.6b-v2-int8");
+    }
+
+    #[test]
+    fn retired_tts_model_id_migrates_to_default() {
+        // A config pinned to the retired int8 Kokoro bundle should load with the
+        // current default TTS model so synthesis doesn't fail on an unknown id.
+        let path = temp_path();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            r#"{
+                "sttProvider": "local",
+                "ttsProvider": "local",
+                "local": {
+                    "sttModel": "parakeet-tdt-0.6b-v2-int8",
+                    "ttsModel": "kokoro-int8-multi-lang-v1_0",
+                    "ttsVoiceSid": 10,
+                    "speed": 1.0
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let s = VoiceSettings::load_from(&path);
+        assert_eq!(s.local.tts_model, "kokoro-multi-lang-v1_0");
+        // Unrelated preferences are preserved through the migration.
+        assert_eq!(s.local.stt_model, "parakeet-tdt-0.6b-v2-int8");
+        assert_eq!(s.local.tts_voice_sid, 10);
+
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 }

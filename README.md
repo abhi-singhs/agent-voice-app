@@ -37,18 +37,18 @@ crates/mcp-server  ──WS client (127.0.0.1 + token)──►  src-tauri WS se
                               • runs on-device (CPU/CoreML)            • STT /v1/speech-to-text
                                           │                                         │ HTTPS
                                           ▼                                         ▼
-                              ~/.copilot/voice-models/                        ElevenLabs
+                              ~/.agent-voice-app/voice-models/                 ElevenLabs
 ```
 
 - The **voice engine** is selectable per direction (STT and TTS). The default is
   **local** (sherpa-onnx); **ElevenLabs** is opt-in. Settings live in
-  `~/.copilot/voice/config.json`.
+  `~/.agent-voice-app/voice/config.json`.
 - The **desktop app** is always-on (lives in the tray/menu bar) and owns the
   hardware — microphone and speaker. It runs a loopback WebSocket server.
 - The **MCP server** is ephemeral: the agent client spawns it per session. It is
   the WebSocket *client*. If the app isn't running it returns `no_device` so the
   agent can gracefully fall back to text.
-- **Discovery/auth:** on startup the app writes `~/.copilot/voice-call/runtime.json`
+- **Discovery/auth:** on startup the app writes `~/.agent-voice-app/voice-call/runtime.json`
   (`{ port, token }`, owner-readable). The MCP server reads it to connect.
 
 ---
@@ -82,30 +82,30 @@ Typical flow: `call_user` → (user answers) → one or more `say_and_listen` tu
 
 The app ships **local-first**. On first run, open **Setup & status** (gear icon)
 → **Voice engine** and click **Download** to fetch the default models into
-`~/.copilot/voice-models/` (a one-time ~615 MB total):
+`~/.agent-voice-app/voice-models/` (a one-time ~816 MB total):
 
 | Direction | Default model | Bundle | Download |
 | --- | --- | --- | --- |
 | Speech-to-text | NeMo Parakeet TDT 0.6b v2 (int8, English) | `sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8` | ~483 MB |
-| Text-to-speech | Kokoro-82M v1.0 (int8, multi-lang, 50+ voices) | `kokoro-int8-multi-lang-v1_0` | ~132 MB |
+| Text-to-speech | Kokoro-82M v1.0 (multi-lang, 50+ voices) | `kokoro-multi-lang-v1_0` | ~333 MB |
 
 After downloading, everything runs on-device (no account, no network, no
 per-use cost). The models run on CPU and use Apple's CoreML when the underlying
 ONNX Runtime build supports it. In the same card you can pick the local **voice**
 and **speaking speed**, or flip either direction to **ElevenLabs**. Your choice
-is saved to `~/.copilot/voice/config.json`.
+is saved to `~/.agent-voice-app/voice/config.json`.
 
 ### ElevenLabs config (optional)
 
 Only needed if you switch the voice engine to ElevenLabs. The easiest way is
 **in the app**: open **Setup & status** (gear icon on the idle screen), click
 **Set up** under *ElevenLabs voice*, paste your API key, **Fetch voices**, pick
-one, and **Save**. The app writes `~/.copilot/elevenlabs/config.json` for you
+one, and **Save**. The app writes `~/.agent-voice-app/elevenlabs/config.json` for you
 (owner-only) and picks it up on the next call — no restart needed. Fetching
 voices also validates the key. Later, click **Change** to switch voice (no need
 to re-enter the key) or paste a new key.
 
-Prefer to do it by hand? Create `~/.copilot/elevenlabs/config.json`:
+Prefer to do it by hand? Create `~/.agent-voice-app/elevenlabs/config.json`:
 
 ```json
 {
@@ -274,7 +274,7 @@ node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool dire
 - **Agent says "no device":** the app isn't running, or the MCP server can't reach
   it. Launch the app and confirm the Setup panel shows *Registered* for the
   client you are using. Delete a
-  stale `~/.copilot/voice-call/runtime.json` if the app was force-killed.
+  stale `~/.agent-voice-app/voice-call/runtime.json` if the app was force-killed.
 - **No microphone prompt / can't hear you:** grant mic access in System Settings →
   Privacy & Security → Microphone. On first use macOS prompts automatically.
 - **"MCP binary not found" in Setup:** run `cargo build -p voice-mcp-server` (dev)
@@ -287,7 +287,7 @@ node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool dire
 ## Notes & limits
 
 - The default **local** engine is free and runs offline — no per-turn cost. On
-  first use you download ~615 MB of models once.
+  first use you download ~816 MB of models once.
 - If you switch to **ElevenLabs**, free-tier credits are limited; each turn then
   spends TTS + STT credits.
 - Batch STT per turn adds ~0.5–1.5s latency; acceptable for v1. Streaming STT is

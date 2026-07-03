@@ -241,7 +241,7 @@ export function VoiceEngineCard() {
 
       {err && <p className="setup-err">{err}</p>}
       <p className="setup-muted setup-hint">
-        Models download to <code>~/.copilot/voice-models/</code>. ElevenLabs (when
+        Models download to <code>~/.agent-voice-app/voice-models/</code>. ElevenLabs (when
         selected) uses the key in the card below.
       </p>
     </div>

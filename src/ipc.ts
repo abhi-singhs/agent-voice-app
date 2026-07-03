@@ -90,7 +90,7 @@ export function listVoices(apiKey?: string): Promise<VoiceSummary[]> {
 }
 
 /**
- * Save the API key and selected voice to `~/.copilot/elevenlabs/config.json`,
+ * Save the API key and selected voice to `~/.agent-voice-app/elevenlabs/config.json`,
  * merging with any existing config. Omit `apiKey` to keep the stored key.
  * Resolves with the updated (non-secret) config.
  */

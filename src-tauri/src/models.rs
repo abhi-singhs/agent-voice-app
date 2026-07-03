@@ -1,7 +1,7 @@
 //! Local model catalog + downloader for the on-device STT/TTS engines.
 //!
 //! Model bundles are the pre-packaged sherpa-onnx `.tar.bz2` archives published
-//! on GitHub. They are downloaded on first use into `~/.copilot/voice-models/`
+//! on GitHub. They are downloaded on first use into `~/.agent-voice-app/voice-models/`
 //! (small app download, fully offline afterwards) and extracted in place. The
 //! webview is kept informed via `voice://model-progress` events.
 
@@ -41,7 +41,7 @@ pub struct ModelSpec {
 }
 
 /// The bundles the app knows how to fetch. Kept small and curated; extend as
-/// needed. Defaults (Parakeet v2 int8 + Kokoro int8 multi-lang) are first.
+/// needed. Defaults (Parakeet v2 int8 + full-precision Kokoro multi-lang) are first.
 pub const CATALOG: &[ModelSpec] = &[
     ModelSpec {
         id: "parakeet-tdt-0.6b-v2-int8",
@@ -52,12 +52,12 @@ pub const CATALOG: &[ModelSpec] = &[
         approx_mb: 483,
     },
     ModelSpec {
-        id: "kokoro-int8-multi-lang-v1_0",
+        id: "kokoro-multi-lang-v1_0",
         kind: ModelKind::Tts,
-        display_name: "Kokoro-82M v1.0 (int8, multi-lang)",
-        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
-        dir_name: "kokoro-int8-multi-lang-v1_0",
-        approx_mb: 132,
+        display_name: "Kokoro-82M v1.0 (multi-lang)",
+        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2",
+        dir_name: "kokoro-multi-lang-v1_0",
+        approx_mb: 333,
     },
 ];
 
@@ -66,10 +66,9 @@ pub fn spec(id: &str) -> Option<&'static ModelSpec> {
     CATALOG.iter().find(|m| m.id == id)
 }
 
-/// Base directory for all downloaded models (`~/.copilot/voice-models/`).
+/// Base directory for all downloaded models (`~/.agent-voice-app/voice-models/`).
 pub fn models_dir() -> Result<PathBuf> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
-    Ok(home.join(".copilot").join("voice-models"))
+    Ok(crate::paths::app_data_dir()?.join("voice-models"))
 }
 
 /// Directory a given model extracts into.
@@ -157,7 +156,9 @@ fn resolve_stt_paths_in(dir: &Path) -> Result<SttModelPaths> {
     })
 }
 
-/// Resolve the Kokoro model files. Prefers the int8 model when present.
+/// Resolve the Kokoro model files. Prefers the full-precision `model.onnx` for
+/// the best audio quality, falling back to an int8 build when that's all that's
+/// present (e.g. an older int8-only download).
 pub fn resolve_tts_paths(id: &str) -> Result<TtsModelPaths> {
     let spec = spec(id).ok_or_else(|| anyhow!("unknown TTS model: {id}"))?;
     let dir = model_dir(spec)?;
@@ -169,7 +170,8 @@ pub fn resolve_tts_paths(id: &str) -> Result<TtsModelPaths> {
 
 /// Resolve Kokoro files within a specific directory (see [`resolve_tts_paths`]).
 fn resolve_tts_paths_in(dir: &Path) -> Result<TtsModelPaths> {
-    let model = find_file(dir, |n| n == "model.int8.onnx")
+    let model = find_file(dir, |n| n == "model.onnx")
+        .or_else(|| find_file(dir, |n| n == "model.int8.onnx"))
         .or_else(|| find_file(dir, |n| n.starts_with("model") && n.ends_with(".onnx")))
         .ok_or_else(|| anyhow!("model .onnx not found in {}", dir.display()))?;
     let voices = dir.join("voices.bin");
@@ -410,21 +412,21 @@ mod tests {
     #[test]
     fn catalog_has_default_models() {
         assert!(spec("parakeet-tdt-0.6b-v2-int8").is_some());
-        assert!(spec("kokoro-int8-multi-lang-v1_0").is_some());
+        assert!(spec("kokoro-multi-lang-v1_0").is_some());
         assert!(spec("does-not-exist").is_none());
     }
 
     #[test]
     fn default_models_have_expected_kinds() {
         assert_eq!(spec("parakeet-tdt-0.6b-v2-int8").unwrap().kind, ModelKind::Stt);
-        assert_eq!(spec("kokoro-int8-multi-lang-v1_0").unwrap().kind, ModelKind::Tts);
+        assert_eq!(spec("kokoro-multi-lang-v1_0").unwrap().kind, ModelKind::Tts);
     }
 
     #[test]
     fn model_dir_is_under_voice_models() {
-        let spec = spec("kokoro-int8-multi-lang-v1_0").unwrap();
+        let spec = spec("kokoro-multi-lang-v1_0").unwrap();
         let dir = model_dir(spec).unwrap();
-        assert!(dir.ends_with("kokoro-int8-multi-lang-v1_0"));
+        assert!(dir.ends_with("kokoro-multi-lang-v1_0"));
         assert!(dir.to_string_lossy().contains("voice-models"));
     }
 
@@ -473,7 +475,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_tts_prefers_int8_over_fp32() {
+    fn resolve_tts_prefers_fp32_over_int8() {
         let dir = std::env::temp_dir()
             .join(format!("voice-prefer-{}-{}", std::process::id(), line!()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -484,7 +486,8 @@ mod tests {
         std::fs::write(dir.join("tokens.txt"), b"x").unwrap();
         std::fs::create_dir_all(dir.join("espeak-ng-data")).unwrap();
         let tts = resolve_tts_paths_in(&dir).unwrap();
-        assert!(tts.model.ends_with("model.int8.onnx"));
+        assert!(tts.model.ends_with("model.onnx"));
+        assert!(!tts.model.ends_with("model.int8.onnx"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

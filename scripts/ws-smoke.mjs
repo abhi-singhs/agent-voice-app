@@ -3,14 +3,14 @@
 // Starts the desktop app first (`pnpm tauri dev`), then run:
 //   node scripts/ws-smoke.mjs
 //
-// It reads ~/.copilot/voice-call/runtime.json, connects to the loopback WS
+// It reads ~/.agent-voice-app/voice-call/runtime.json, connects to the loopback WS
 // server, performs the Hello handshake, and exchanges a Ping/Pong.
 
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const runtimePath = join(homedir(), ".copilot", "voice-call", "runtime.json");
+const runtimePath = join(homedir(), ".agent-voice-app", "voice-call", "runtime.json");
 
 let runtime;
 try {

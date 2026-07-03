@@ -1,16 +1,14 @@
 //! Persisted call history: each answered call's transcript is appended to
-//! `~/.copilot/voice-call/history.jsonl` (one JSON record per line) so the user
+//! `~/.agent-voice-app/voice-call/history.jsonl` (one JSON record per line) so the user
 //! can review past conversations. The file is capped to the most recent
 //! [`MAX_RECORDS`] calls.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-/// History file location relative to the home directory.
-const HISTORY_REL: &str = ".copilot/voice-call/history.jsonl";
 /// Keep at most this many recent calls.
 const MAX_RECORDS: usize = 200;
 
@@ -38,8 +36,9 @@ pub struct CallRecord {
 
 /// Absolute path to the history file.
 fn history_path() -> Result<PathBuf> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
-    Ok(home.join(HISTORY_REL))
+    Ok(crate::paths::app_data_dir()?
+        .join("voice-call")
+        .join("history.jsonl"))
 }
 
 /// Parse a JSONL blob into records, skipping blank or malformed lines.
