@@ -1,4 +1,4 @@
-//! Copilot Voice Call MCP server.
+//! Agent Voice App MCP server.
 //!
 //! Spawned by an MCP-capable agent client over stdio. Exposes voice tools and bridges them
 //! to the always-on desktop app over a localhost WebSocket. If no app is
@@ -85,7 +85,7 @@ impl VoiceServer {
 impl VoiceServer {
     #[tool(
         name = "call_user",
-        description = "Ring the user's Copilot Voice Call desktop app to start a voice call. \
+        description = "Ring the user's Agent Voice App desktop app to start a voice call. \
 Returns { status } where status is \"answered\", \"declined\", \"timeout\", or \
 \"no_device\" (no app reachable — fall back to text)."
     )]
@@ -192,10 +192,10 @@ impl ServerHandler for VoiceServer {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(
                 Implementation::new(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
-                    .with_title("Copilot Voice Call"),
+                    .with_title("Agent Voice App"),
             )
             .with_instructions(
-                "Voice calling for the user via the Copilot Voice Call desktop app. \
+                "Voice calling for the user via the Agent Voice App desktop app. \
 Call `call_user` to start a call; if it returns \"answered\", use `say_and_listen` for \
 back-and-forth conversation, `voice_say` for one-way announcements, and `end_call` to hang up. \
 If `call_user` returns \"no_device\", the app isn't running — continue in text.",

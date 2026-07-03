@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MCP smoke test for copilot-voice-mcp.
+// MCP smoke test for agent-voice-mcp.
 //
 // Speaks newline-delimited JSON-RPC (the MCP stdio framing) to the compiled
 // server binary: initialize -> tools/list -> optionally call a tool.
@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const bin = resolve(__dirname, "..", "target", "debug", "copilot-voice-mcp");
+const bin = resolve(__dirname, "..", "target", "debug", "agent-voice-mcp");
 
 const toolName = process.argv[2] || null;
 const toolArgs = process.argv[3]

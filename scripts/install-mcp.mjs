@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Register (or update) the Copilot Voice Call MCP server in a supported MCP
+// Register (or update) the Agent Voice App MCP server in a supported MCP
 // client's config so the agent can call the voice tools.
 //
 // Idempotent: preserves any existing servers (e.g. playwright) and simply
-// upserts the "copilot-voice-mcp" entry with an absolute path to the compiled
+// upserts the "agent-voice-mcp" entry with an absolute path to the compiled
 // binary.
 //
 // Usage:
@@ -23,7 +23,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SERVER_NAME = "copilot-voice-mcp";
+const SERVER_NAME = "agent-voice-mcp";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 
@@ -168,7 +168,7 @@ function tomlString(value) {
 }
 
 function codexTableHeader(line) {
-  return /^\s*\[mcp_servers\.(?:"copilot-voice-mcp"|copilot-voice-mcp)\]\s*(?:#.*)?$/.test(
+  return /^\s*\[mcp_servers\.(?:"agent-voice-mcp"|agent-voice-mcp)\]\s*(?:#.*)?$/.test(
     line,
   );
 }

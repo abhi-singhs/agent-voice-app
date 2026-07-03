@@ -40,7 +40,7 @@ export function IdleScreen() {
       <div className="idle-badge" aria-hidden>
         <span className="idle-badge__glyph">☎️</span>
       </div>
-      <h1 className="idle-title">Copilot Voice Call</h1>
+      <h1 className="idle-title">Agent Voice App</h1>
       <p className="idle-subtitle">{dnd ? "Do Not Disturb" : "Waiting for a call…"}</p>
       <p className="idle-hint">
         {dnd

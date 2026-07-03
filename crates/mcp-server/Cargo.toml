@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Copilot Voice Call MCP server (stdio) that bridges the agent to the desktop app"
+description = "Agent Voice App MCP server (stdio) that bridges the agent to the desktop app"
 
 [[bin]]
-name = "copilot-voice-mcp"
+name = "agent-voice-mcp"
 path = "src/main.rs"
 
 [dependencies]

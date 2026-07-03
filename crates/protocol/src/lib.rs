@@ -1,4 +1,4 @@
-//! Shared protocol types for Copilot Voice Call.
+//! Shared protocol types for Agent Voice App.
 //!
 //! These types are the single source of truth for the localhost WebSocket
 //! messages exchanged between the Tauri app (WS server) and the MCP server

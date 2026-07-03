@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Shared WebSocket protocol types for Copilot Voice Call"
+description = "Shared WebSocket protocol types for Agent Voice App"
 
 [dependencies]
 serde = { workspace = true }

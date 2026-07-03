@@ -1,5 +1,5 @@
 //! Throwaway probe: real ElevenLabs TTS→STT round-trip using the user's config.
-//! Run with: cargo run -p copilot-voice-call --example voice_probe
+//! Run with: cargo run -p agent-voice-app --example voice_probe
 //! Uses minimal text to conserve free-tier credits.
 
 use app_lib::{config::ElevenLabsConfig, elevenlabs};

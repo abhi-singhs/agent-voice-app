@@ -1,4 +1,4 @@
-# Copilot Voice Call
+# Agent Voice App
 
 A cross-platform desktop **phone for your coding agent**. The agent *calls* you
 through an MCP server; you answer in the app and have a natural, spoken
@@ -125,9 +125,9 @@ shapes:
 ```json
 {
   "mcpServers": {
-    "copilot-voice-mcp": {
+    "agent-voice-mcp": {
       "type": "stdio",
-      "command": "/absolute/path/to/copilot-voice-mcp",
+      "command": "/absolute/path/to/agent-voice-mcp",
       "args": [],
       "tools": ["*"]
     }
@@ -166,7 +166,7 @@ pnpm tauri build
 
 This runs the frontend build, stages the MCP server as a Tauri **sidecar**
 (`scripts/prepare-sidecar.mjs` builds it and names it
-`copilot-voice-mcp-<target-triple>`), and produces a bundle:
+`agent-voice-mcp-<target-triple>`), and produces a bundle:
 
 - **macOS:** `.app` and `.dmg` under `src-tauri/target/release/bundle/`
 - **Windows:** `.msi` / `.exe`
@@ -233,7 +233,7 @@ scripts/
 ```bash
 pnpm test                                  # frontend (Vitest)
 cargo test                                 # Rust unit tests
-cargo run -p copilot-voice-call --example voice_probe   # live ElevenLabs TTS→STT round-trip
+cargo run -p agent-voice-app --example voice_probe   # live ElevenLabs TTS→STT round-trip
 node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool directly
 ```
 
