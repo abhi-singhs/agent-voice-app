@@ -209,6 +209,27 @@ pnpm sidecar              # release
 pnpm sidecar --debug      # debug (for dev)
 ```
 
+### Automated releases (CI)
+
+Two GitHub Actions workflows live in `.github/workflows/`:
+
+- **CI** (`ci.yml`) — on every push/PR to `main`, runs the frontend tests +
+  build and compiles/tests the Rust workspace on Linux, macOS, and Windows.
+- **Release** (`release.yml`) — builds signed-or-unsigned installers for macOS
+  (Apple Silicon + Intel), Windows, and Linux, then uploads them to a **draft**
+  GitHub Release. Trigger it by pushing a version tag, or run it manually from
+  the Actions tab with an explicit tag:
+
+  ```bash
+  git tag v0.1.0
+  git push origin v0.1.0
+  ```
+
+  Each runner stages the MCP sidecar for its own target triple, so the bundled
+  `externalBin` matches the platform. macOS code signing / notarization is
+  optional — set the `APPLE_*` repository secrets to enable it; without them the
+  builds are produced unsigned.
+
 ---
 
 ## Using it in a call
