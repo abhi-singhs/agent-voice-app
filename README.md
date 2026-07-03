@@ -216,7 +216,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 - **CI** (`ci.yml`) — on every push/PR to `main`, runs the frontend tests +
   build and compiles/tests the Rust workspace on Linux, macOS, and Windows.
 - **Release** (`release.yml`) — builds signed-or-unsigned installers for macOS
-  (Apple Silicon + Intel), Windows, and Linux, then uploads them to a **draft**
+  (Apple Silicon), Windows, and Linux, then uploads them to a **draft**
   GitHub Release. Trigger it by pushing a version tag, or run it manually from
   the Actions tab with an explicit tag:
 
