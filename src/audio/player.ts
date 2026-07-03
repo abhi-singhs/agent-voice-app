@@ -5,6 +5,9 @@
 let ctx: AudioContext | null = null;
 let current: AudioBufferSourceNode | null = null;
 let currentAudioEl: HTMLAudioElement | null = null;
+// Bumped by stopPlayback() (external interrupt: barge-in / hang-up). A streaming
+// caller captures it and compares to know when to stop queuing more chunks.
+let generation = 0;
 
 function audioContext(): AudioContext {
   if (!ctx) {
@@ -20,7 +23,9 @@ function audioContext(): AudioContext {
  * playback cannot start). Any in-flight playback is stopped first.
  */
 export async function playTts(data: ArrayBuffer): Promise<void> {
-  stopPlayback();
+  // Stop the previous clip without bumping `generation`: playing the next chunk
+  // in a stream is an internal transition, not an external interrupt.
+  haltCurrent();
   try {
     const context = audioContext();
     if (context.state === "suspended") await context.resume();
@@ -76,8 +81,8 @@ function sniffMime(data: ArrayBuffer): string {
   return "audio/mpeg";
 }
 
-/** Stop any in-flight TTS playback immediately. */
-export function stopPlayback(): void {
+/** Stop any active source/element. Internal: does not bump `generation`. */
+function haltCurrent(): void {
   if (current) {
     try {
       current.stop();
@@ -94,4 +99,19 @@ export function stopPlayback(): void {
     }
     currentAudioEl = null;
   }
+}
+
+/** Stop any in-flight TTS playback immediately (external interrupt). */
+export function stopPlayback(): void {
+  haltCurrent();
+  generation++;
+}
+
+/**
+ * Monotonic token bumped by every {@link stopPlayback} call. A streaming caller
+ * captures it before playback and compares afterwards to detect a barge-in or
+ * hang-up and stop synthesizing/queuing further chunks.
+ */
+export function playbackGeneration(): number {
+  return generation;
 }

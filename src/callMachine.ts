@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 
-import { playTts, stopPlayback } from "./audio/player";
+import { playTts, playbackGeneration, stopPlayback } from "./audio/player";
+import { splitIntoSpeechChunks } from "./audio/chunk";
 import { startListening, type ListenHandle } from "./audio/listen";
 import { Ringer } from "./audio/ringtone";
 import {
@@ -90,12 +91,34 @@ export function useCallMachine(): CallController {
 
   // Speak text via TTS; resolves true on success, false if audio failed. A
   // failure is non-fatal — captions still show — but we surface a note so the
-  // user knows to rely on text.
+  // user knows to rely on text. Long replies are streamed sentence-by-sentence:
+  // the next chunk is synthesized while the current one plays, so speech starts
+  // after the first sentence instead of the whole reply.
   const speak = useCallback(async (text: string): Promise<boolean> => {
     ttsActiveRef.current = true;
     try {
-      const bytes = await tts(text);
-      await playTts(bytes);
+      const chunks = splitIntoSpeechChunks(text);
+      // Short reply: one synth + one playback (identical to the non-streaming path).
+      if (chunks.length <= 1) {
+        const bytes = await tts(chunks[0] ?? text);
+        await playTts(bytes);
+        return true;
+      }
+      // Pipeline: prefetch chunk i+1 while chunk i plays. `playbackGeneration`
+      // is bumped by stopPlayback() (barge-in / hang-up); when it changes we stop
+      // queuing and playing so an interrupt cuts speech off immediately.
+      const gen = playbackGeneration();
+      let next = tts(chunks[0]);
+      for (let i = 0; i < chunks.length; i++) {
+        const bytes = await next;
+        if (playbackGeneration() !== gen) return true;
+        if (i + 1 < chunks.length) {
+          next = tts(chunks[i + 1]);
+          next.catch(() => {}); // don't leak a rejection if we bail out early
+        }
+        await playTts(bytes);
+        if (playbackGeneration() !== gen) return true;
+      }
       return true;
     } catch (err) {
       console.error("TTS failed:", err);
