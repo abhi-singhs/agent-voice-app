@@ -34,4 +34,12 @@ voice-protocol = { path = "../crates/protocol" }
 tauri-plugin-single-instance = "2.4.2"
 tauri-plugin-notification = "2.3.3"
 base64 = "0.22.1"
-reqwest = { version = "0.12", features = ["json", "multipart"] }
+reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+# Local, on-device STT (Parakeet) + TTS (Kokoro) via sherpa-onnx (ONNX Runtime,
+# CoreML on Apple Silicon). Static linking by default -> self-contained binary.
+sherpa-onnx = "1.13.3"
+# WAV decode (mic input) / encode (local TTS output).
+hound = "3.5"
+# Extracting the .tar.bz2 model bundles downloaded on first use.
+tar = "0.4"
+bzip2 = "0.5"

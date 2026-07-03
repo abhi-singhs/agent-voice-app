@@ -106,7 +106,8 @@ export function saveVoiceConfig(args: {
   });
 }
 
-/** Synthesize `text` to speech; resolves with mp3 bytes. */
+/** Synthesize `text` to speech; resolves with audio bytes (WAV locally, mp3 for
+ * ElevenLabs — {@link playTts} detects the format). */
 export async function tts(text: string): Promise<ArrayBuffer> {
   return invoke<ArrayBuffer>("tts", { text });
 }
@@ -114,6 +115,104 @@ export async function tts(text: string): Promise<ArrayBuffer> {
 /** Transcribe base64-encoded audio; resolves with the recognized text. */
 export function stt(audio: string, mime: string, filename: string): Promise<string> {
   return invoke("stt", { audio, mime, filename });
+}
+
+// --- Voice engine (local vs ElevenLabs) ---
+
+/** Which backend powers a direction. Mirrors the Rust `Provider` enum. */
+export type VoiceProvider = "local" | "elevenlabs";
+
+/** Local-model preferences, mirrors the Rust `LocalSettings`. */
+export interface LocalSettings {
+  sttModel: string;
+  ttsModel: string;
+  ttsVoiceSid: number;
+  speed: number;
+}
+
+/** Voice-engine settings, mirrors the Rust `VoiceSettings`. */
+export interface VoiceSettings {
+  sttProvider: VoiceProvider;
+  ttsProvider: VoiceProvider;
+  local: LocalSettings;
+}
+
+/** Fetch the current voice-engine settings (providers + local prefs). */
+export function voiceSettings(): Promise<VoiceSettings> {
+  return invoke("voice_settings");
+}
+
+/** Switch the speech-to-text provider. Resolves with the updated settings. */
+export function setSttProvider(provider: VoiceProvider): Promise<VoiceSettings> {
+  return invoke("set_stt_provider", { provider });
+}
+
+/** Switch the text-to-speech provider. Resolves with the updated settings. */
+export function setTtsProvider(provider: VoiceProvider): Promise<VoiceSettings> {
+  return invoke("set_tts_provider", { provider });
+}
+
+/** Update the local TTS voice (speaker id) and/or speaking rate. */
+export function setLocalVoice(args: {
+  sid?: number;
+  speed?: number;
+}): Promise<VoiceSettings> {
+  return invoke("set_local_voice", { sid: args.sid ?? null, speed: args.speed ?? null });
+}
+
+/** A selectable local voice, mirrors the Rust `VoiceInfo`. */
+export interface LocalVoice {
+  sid: number;
+  name: string;
+  locale: string;
+  gender: string;
+}
+
+/** List the selectable local TTS voices. */
+export function listLocalVoices(): Promise<LocalVoice[]> {
+  return invoke("list_local_voices");
+}
+
+/** Install status of a local model, mirrors the Rust `ModelStatus`. */
+export interface ModelStatus {
+  id: string;
+  kind: "stt" | "tts";
+  display_name: string;
+  installed: boolean;
+  approx_mb: number;
+}
+
+/** Report install status of every known local model. */
+export function modelStatus(): Promise<ModelStatus[]> {
+  return invoke("model_status");
+}
+
+/** Download (and extract) a local model. Progress arrives via {@link onModelProgress}. */
+export function downloadModel(id: string): Promise<void> {
+  return invoke("download_model", { id });
+}
+
+/** Delete a downloaded local model. Resolves with refreshed statuses. */
+export function deleteModel(id: string): Promise<ModelStatus[]> {
+  return invoke("delete_model", { id });
+}
+
+/** Event name the backend emits during model downloads. */
+export const MODEL_PROGRESS_EVENT = "voice://model-progress";
+
+/** Download progress payload, mirrors the Rust `ModelProgress`. */
+export interface ModelProgress {
+  id: string;
+  phase: "download" | "extract" | "done" | "error";
+  received: number;
+  total: number;
+  pct: number;
+  message?: string;
+}
+
+/** Subscribe to model-download progress. Returns an unlisten function. */
+export function onModelProgress(handler: (p: ModelProgress) => void): Promise<UnlistenFn> {
+  return listen<ModelProgress>(MODEL_PROGRESS_EVENT, (event) => handler(event.payload));
 }
 
 /** Supported MCP client, mirrors the Rust `McpClientInfo`. */

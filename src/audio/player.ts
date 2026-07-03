@@ -45,7 +45,7 @@ export async function playTts(data: ArrayBuffer): Promise<void> {
 }
 
 async function playViaElement(data: ArrayBuffer): Promise<void> {
-  const blob = new Blob([data], { type: "audio/mpeg" });
+  const blob = new Blob([data], { type: sniffMime(data) });
   const url = URL.createObjectURL(blob);
   const el = new Audio(url);
   currentAudioEl = el;
@@ -65,6 +65,15 @@ async function playViaElement(data: ArrayBuffer): Promise<void> {
     if (currentAudioEl === el) currentAudioEl = null;
     URL.revokeObjectURL(url);
   }
+}
+
+/** Guess the container type from magic bytes: "RIFF" => WAV, else mp3. */
+function sniffMime(data: ArrayBuffer): string {
+  const b = new Uint8Array(data, 0, Math.min(4, data.byteLength));
+  if (b.length >= 4 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46) {
+    return "audio/wav";
+  }
+  return "audio/mpeg";
 }
 
 /** Stop any in-flight TTS playback immediately. */
