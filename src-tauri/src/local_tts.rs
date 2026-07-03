@@ -35,6 +35,18 @@ fn providers() -> &'static [&'static str] {
     }
 }
 
+/// Intra-op thread count for synthesis. Scales with the machine but stays
+/// clamped to a small range: more than a handful of threads oversubscribes the
+/// CPU (hurting latency), while the floor keeps small/VM hosts responsive. Helps
+/// the CPU-executed ops even when the CoreML provider handles the rest.
+fn synthesis_threads() -> i32 {
+    const MIN: usize = 2;
+    const MAX: usize = 4;
+    std::thread::available_parallelism()
+        .map(|n| n.get().clamp(MIN, MAX))
+        .unwrap_or(MIN) as i32
+}
+
 fn build_tts(model_id: &str) -> Result<OfflineTts> {
     let paths = models::resolve_tts_paths(model_id)?;
     let to_str = |p: &std::path::Path| p.to_string_lossy().to_string();
@@ -64,7 +76,7 @@ fn build_tts(model_id: &str) -> Result<OfflineTts> {
                     lexicon: lexicon.clone(),
                     ..Default::default()
                 },
-                num_threads: 2,
+                num_threads: synthesis_threads(),
                 provider: Some((*provider).to_string()),
                 debug: false,
                 ..Default::default()
@@ -216,6 +228,12 @@ mod tests {
     #[test]
     fn catalog_has_53_voices() {
         assert_eq!(KOKORO_VOICES.len(), 53);
+    }
+
+    #[test]
+    fn synthesis_threads_are_clamped() {
+        let n = synthesis_threads();
+        assert!((2..=4).contains(&n), "threads {n} outside [2,4]");
     }
 
     #[test]

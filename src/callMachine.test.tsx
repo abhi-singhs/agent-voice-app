@@ -35,7 +35,9 @@ vi.mock("./notify", () => ({ notifyIncomingCall: vi.fn(() => Promise.resolve()) 
 // (onended/onpause fire on stop), so interrupt/barge flows can be exercised.
 const playTts = vi.fn(() => Promise.resolve());
 let resolvePlayback: (() => void) | null = null;
+let playbackGen = 0;
 const stopPlayback = vi.fn(() => {
+  playbackGen++;
   const r = resolvePlayback;
   resolvePlayback = null;
   r?.();
@@ -43,6 +45,7 @@ const stopPlayback = vi.fn(() => {
 vi.mock("./audio/player", () => ({
   playTts: (...a: unknown[]) => playTts(...(a as [])),
   stopPlayback: (...a: unknown[]) => stopPlayback(...(a as [])),
+  playbackGeneration: () => playbackGen,
 }));
 
 /** A playback promise that only resolves when stopPlayback() is called. */
@@ -100,6 +103,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requestHandler = null;
   resolvePlayback = null;
+  playbackGen = 0;
   playTts.mockReturnValue(Promise.resolve());
   tts.mockReturnValue(Promise.resolve(new ArrayBuffer(8)));
   stt.mockReturnValue(Promise.resolve("hello there"));
@@ -354,6 +358,42 @@ describe("useCallMachine", () => {
       expect(result.current.state.phase).toBe("connected");
       act(() => result.current.interrupt());
       expect(stopPlayback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("streaming synthesis", () => {
+    const s1 = "This is the very first sentence of a longer streamed reply for testing.";
+    const s2 = "And this is the second sentence which should synthesize while the first plays.";
+
+    it("streams a multi-sentence reply as several synth + playback calls", async () => {
+      const { result } = await connect(1);
+      emit({ kind: "say", id: 2, text: `${s1} ${s2}` });
+      await flush();
+
+      // One synth + one playback per chunk (two sentences => two chunks).
+      expect(tts).toHaveBeenCalledTimes(2);
+      expect(playTts).toHaveBeenCalledTimes(2);
+      expect(respondAck).toHaveBeenCalledWith(2, "ok");
+      expect(result.current.state.phase).toBe("connected");
+    });
+
+    it("stops streaming the rest of the reply when interrupted mid-stream", async () => {
+      // First chunk blocks until stopPlayback() (barge-in / hang-up) fires.
+      playTts.mockImplementationOnce(playbackUntilStopped);
+      const { result } = await connect(1);
+      emit({ kind: "say_and_listen", id: 2, text: `${s1} ${s2}`, listen: true, listen_timeout_sec: null });
+      await flush();
+      expect(result.current.state.phase).toBe("speaking");
+      expect(playTts).toHaveBeenCalledTimes(1);
+
+      act(() => result.current.interrupt());
+      await flush();
+
+      // The interrupt bumps the playback generation, so the second chunk is
+      // never played even though it was prefetched.
+      expect(stopPlayback).toHaveBeenCalled();
+      expect(playTts).toHaveBeenCalledTimes(1);
+      expect(result.current.state.phase).toBe("listening");
     });
   });
 });
