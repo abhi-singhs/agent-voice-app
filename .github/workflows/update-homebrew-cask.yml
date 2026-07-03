@@ -95,10 +95,12 @@ jobs:
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- "${CASK_PATH}"; then
+          git add "${CASK_PATH}"
+          # Check the staged diff so a brand-new (untracked) cask is detected too;
+          # plain `git diff` ignores untracked files.
+          if git diff --cached --quiet -- "${CASK_PATH}"; then
             echo "Cask already up to date; nothing to commit."
             exit 0
           fi
-          git add "${CASK_PATH}"
           git commit -m "agent-voice-app ${VERSION}"
           git push
