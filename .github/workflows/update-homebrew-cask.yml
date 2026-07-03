@@ -1,0 +1,102 @@
+name: Update Homebrew cask
+
+# When a GitHub Release is published (the Release workflow creates a *draft*
+# release; publishing it fires this), compute the sha256 of the macOS Apple
+# Silicon DMG, render the cask from packaging/homebrew/agent-voice-app.rb, and
+# push it to the personal tap repo as Casks/agent-voice-app.rb.
+#
+# Requirements (one-time):
+#   1. Create the tap repo: abhi-singhs/homebrew-tap (public).
+#   2. Create a fine-grained PAT with `Contents: read and write` on that repo and
+#      add it to THIS repo's secrets as HOMEBREW_TAP_TOKEN.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to sync the cask from (e.g. v0.1.0)"
+        required: true
+
+concurrency:
+  group: update-homebrew-cask
+  cancel-in-progress: false
+
+env:
+  TAP_REPO: abhi-singhs/homebrew-tap
+  APP_REPO: abhi-singhs/agent-voice-app
+  CASK_PATH: Casks/agent-voice-app.rb
+
+jobs:
+  update-cask:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout app repo (for the cask template)
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag and version
+        id: rel
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+          if [ -z "${TAG}" ]; then
+            echo "No release tag available." >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=${TAG} version=${VERSION}"
+
+      - name: Download DMG and compute sha256
+        id: dmg
+        env:
+          TAG: ${{ steps.rel.outputs.tag }}
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: |
+          set -euo pipefail
+          DMG="Agent.Voice.App_${VERSION}_aarch64.dmg"
+          URL="https://github.com/${APP_REPO}/releases/download/${TAG}/${DMG}"
+          echo "Downloading ${URL}"
+          curl -fL --retry 3 --retry-delay 5 -o "${DMG}" "${URL}"
+          SHA="$(shasum -a 256 "${DMG}" | awk '{print $1}')"
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "Computed sha256=${SHA}"
+
+      - name: Render cask
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+          SHA256: ${{ steps.dmg.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          mkdir -p rendered
+          sed -e "s/__VERSION__/${VERSION}/g" \
+              -e "s/__SHA256__/${SHA256}/g" \
+              packaging/homebrew/agent-voice-app.rb > rendered/agent-voice-app.rb
+          echo "----- rendered cask -----"
+          cat rendered/agent-voice-app.rb
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TAP_REPO }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Commit and push updated cask
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "tap/$(dirname "${CASK_PATH}")"
+          cp rendered/agent-voice-app.rb "tap/${CASK_PATH}"
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- "${CASK_PATH}"; then
+            echo "Cask already up to date; nothing to commit."
+            exit 0
+          fi
+          git add "${CASK_PATH}"
+          git commit -m "agent-voice-app ${VERSION}"
+          git push

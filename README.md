@@ -19,8 +19,29 @@ switch to [ElevenLabs](https://elevenlabs.io) for the voice at any time.
 Download the installer for your platform from the
 [**Releases**](https://github.com/abhi-singhs/agent-voice-app/releases) page.
 
+### macOS via Homebrew (recommended, Apple Silicon)
+
+The cleanest way to install on an Apple-Silicon Mac — the cask handles the
+quarantine flag for you, so you never see the "damaged" dialog:
+
+```bash
+brew tap abhi-singhs/tap
+brew install --cask agent-voice-app
+```
+
+Upgrade later with `brew upgrade --cask agent-voice-app`, uninstall with
+`brew uninstall --cask agent-voice-app` (add `--zap` to also remove
+`~/.agent-voice-app`). Intel Macs aren't covered yet (only an `aarch64` DMG is
+published); use the manual download below.
+
+> Maintainer setup: the cask lives in a personal tap. See
+> [`packaging/homebrew/`](packaging/homebrew/) and the
+> `Update Homebrew cask` workflow — it needs a `homebrew-tap` repo and a
+> `HOMEBREW_TAP_TOKEN` secret.
+
 ### macOS: "Agent Voice App.app is damaged and can't be opened"
 
+If you downloaded the `.dmg`/`.app` directly (not via Homebrew), you may hit this.
 macOS release builds are **unsigned** (no paid Apple Developer ID / notarization).
 When you download an unsigned `.app` through a browser, Gatekeeper attaches a
 `com.apple.quarantine` flag and — on Apple Silicon — shows a misleading
