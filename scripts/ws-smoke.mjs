@@ -1,4 +1,4 @@
-// Smoke test for the Copilot Voice Call WebSocket server (phase P1).
+// Smoke test for the Agent Voice App WebSocket server (phase P1).
 //
 // Starts the desktop app first (`pnpm tauri dev`), then run:
 //   node scripts/ws-smoke.mjs

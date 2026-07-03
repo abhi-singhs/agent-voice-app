@@ -4,7 +4,7 @@
 // Tauri bundles external binaries named `<name>-<target-triple>` and, at runtime,
 // places them next to the main app binary under their plain `<name>`. This script
 // builds `voice-mcp-server` and copies the result to
-// `src-tauri/binaries/copilot-voice-mcp-<triple>` so `tauri build` can bundle it.
+// `src-tauri/binaries/agent-voice-mcp-<triple>` so `tauri build` can bundle it.
 //
 // Usage:
 //   node scripts/prepare-sidecar.mjs            # release build (for bundling)
@@ -16,7 +16,7 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const BIN_NAME = "copilot-voice-mcp";
+const BIN_NAME = "agent-voice-mcp";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 

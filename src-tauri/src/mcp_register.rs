@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use toml_edit::{value as toml_value, Array, DocumentMut, Item, Table, Value as TomlValue};
 
 /// Key under the client's server map and the base name of the MCP server binary.
-const SERVER_KEY: &str = "copilot-voice-mcp";
+const SERVER_KEY: &str = "agent-voice-mcp";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ClientKind {
@@ -86,7 +86,7 @@ pub struct McpStatus {
     pub client_id: String,
     /// Human-readable selected client name.
     pub client_name: String,
-    /// True when a `copilot-voice-mcp` entry exists in the selected client config.
+    /// True when a `agent-voice-mcp` entry exists in the selected client config.
     pub registered: bool,
     /// True when the registered entry matches the current binary path and shape.
     pub up_to_date: bool,
@@ -163,7 +163,7 @@ fn resolve_server_bin() -> Result<PathBuf> {
     }
 
     // Fallback: a target-triple-suffixed sidecar that wasn't renamed
-    // (e.g. copilot-voice-mcp-aarch64-apple-darwin). Pick the first match.
+    // (e.g. agent-voice-mcp-aarch64-apple-darwin). Pick the first match.
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let name = entry.file_name();
@@ -508,12 +508,12 @@ mod tests {
                 "playwright": { "type": "stdio", "command": "pw", "args": [], "tools": ["*"] }
             }
         });
-        let changed = apply_json_register(&mut root, copilot, "/path/to/copilot-voice-mcp");
+        let changed = apply_json_register(&mut root, copilot, "/path/to/agent-voice-mcp");
         assert!(changed);
         assert_eq!(root["mcpServers"]["playwright"]["command"], json!("pw"));
         let entry = &root["mcpServers"][SERVER_KEY];
         assert_eq!(entry["type"], json!("stdio"));
-        assert_eq!(entry["command"], json!("/path/to/copilot-voice-mcp"));
+        assert_eq!(entry["command"], json!("/path/to/agent-voice-mcp"));
         assert_eq!(entry["args"], json!([]));
         assert_eq!(entry["tools"], json!(["*"]));
     }
@@ -588,7 +588,7 @@ mod tests {
         assert!(toml_entry_matches(&doc, "/bin/voice"));
         let out = doc.to_string();
         assert!(out.contains("model = \"gpt-5.5\""));
-        assert!(out.contains("[mcp_servers.copilot-voice-mcp]"));
+        assert!(out.contains("[mcp_servers.agent-voice-mcp]"));
         assert!(out.contains("command = \"/bin/voice\""));
         assert!(out.contains("args = []"));
     }
@@ -609,7 +609,7 @@ mod tests {
 command = "keep"
 args = []
 
-[mcp_servers.copilot-voice-mcp]
+[mcp_servers.agent-voice-mcp]
 command = "voice"
 args = []
 "#,
@@ -632,7 +632,7 @@ args = []
                 up_to_date: true,
             },
             Path::new("/home/u/.copilot/mcp-config.json"),
-            Path::new("/tmp/copilot-voice-mcp"),
+            Path::new("/tmp/agent-voice-mcp"),
         );
         assert_eq!(st.client_id, "copilot");
         assert_eq!(st.client_name, "Copilot CLI");

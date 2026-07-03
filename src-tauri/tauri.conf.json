@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Copilot Voice Call",
+  "productName": "Agent Voice App",
   "version": "0.1.0",
-  "identifier": "com.abhisingh.copilot-voice-call",
+  "identifier": "in.abhisingh.agent-voice-app",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Copilot Voice Call",
+        "title": "Agent Voice App",
         "width": 420,
         "height": 720
       }
@@ -26,9 +26,9 @@
     "targets": "all",
     "category": "Utility",
     "shortDescription": "Talk to the Copilot agent like a phone call.",
-    "longDescription": "Copilot Voice Call is a desktop phone for your Copilot agent. The agent calls you through an MCP server; you answer in the app and have a spoken back-and-forth using ElevenLabs text-to-speech and speech-to-text.",
+    "longDescription": "Agent Voice App is a desktop phone for your Copilot agent. The agent calls you through an MCP server; you answer in the app and have a spoken back-and-forth using ElevenLabs text-to-speech and speech-to-text.",
     "copyright": "Copyright © 2026 abhi-singh",
-    "externalBin": ["binaries/copilot-voice-mcp"],
+    "externalBin": ["binaries/agent-voice-mcp"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
