@@ -1,0 +1,39 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1b294a"/>
+      <stop offset="0.55" stop-color="#131a2e"/>
+      <stop offset="1" stop-color="#0b1020"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="512" cy="500" r="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f5a623" stop-opacity="0.28"/>
+      <stop offset="0.55" stop-color="#f5a623" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#f5a623" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="amber" x1="300" y1="300" x2="760" y2="780" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe0a3"/>
+      <stop offset="0.45" stop-color="#ffcf72"/>
+      <stop offset="1" stop-color="#f5a623"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="560" y1="230" x2="800" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd98a"/>
+      <stop offset="1" stop-color="#f5a623"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="230" fill="url(#glow)"/>
+  <rect x="6" y="6" width="1012" height="1012" rx="226" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="3"/>
+
+  <!-- voice / call waves emanating up-right -->
+  <g fill="none" stroke="url(#wave)" stroke-linecap="round">
+    <path d="M600 356 A70 70 0 0 1 670 426"  stroke-width="30" stroke-opacity="1"/>
+    <path d="M600 296 A130 130 0 0 1 730 426" stroke-width="30" stroke-opacity="0.82"/>
+    <path d="M600 236 A190 190 0 0 1 790 426" stroke-width="30" stroke-opacity="0.6"/>
+  </g>
+
+  <!-- phone handset -->
+  <g transform="translate(150,300) scale(21.5)">
+    <path fill="url(#amber)" d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+  </g>
+</svg>

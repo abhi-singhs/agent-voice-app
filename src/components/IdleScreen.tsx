@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { getDnd, setDnd } from "../ipc";
+import { AgentAvatar } from "./AgentAvatar";
 import { HistoryPanel } from "./HistoryPanel";
 import { SetupPanel } from "./SetupPanel";
 
@@ -38,7 +39,7 @@ export function IdleScreen() {
         ⚙
       </button>
       <div className="idle-badge" aria-hidden>
-        <span className="idle-badge__glyph">☎️</span>
+        <AgentAvatar className="idle-badge__glyph" />
       </div>
       <h1 className="idle-title">Agent Voice App</h1>
       <p className="idle-subtitle">{dnd ? "Do Not Disturb" : "Waiting for a call…"}</p>

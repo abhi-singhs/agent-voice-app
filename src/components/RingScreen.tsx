@@ -1,3 +1,5 @@
+import { AgentAvatar } from "./AgentAvatar";
+
 interface Props {
   reason: string | null;
   onAnswer: () => void;
@@ -8,7 +10,7 @@ export function RingScreen({ reason, onAnswer, onDecline }: Props) {
   return (
     <section className="screen screen--ring">
       <div className="ring-avatar" aria-hidden>
-        <span className="ring-avatar__glyph">🤖</span>
+        <AgentAvatar className="ring-avatar__glyph" />
         <span className="ring-pulse" />
       </div>
 
