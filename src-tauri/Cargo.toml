@@ -33,6 +33,7 @@ anyhow = { workspace = true }
 voice-protocol = { path = "../crates/protocol" }
 tauri-plugin-single-instance = "2.4.2"
 tauri-plugin-notification = "2.3.3"
+tauri-plugin-autostart = "2"
 base64 = "0.22.1"
 reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
 # Local, on-device STT (Parakeet) + TTS (Kokoro) via sherpa-onnx (ONNX Runtime,
