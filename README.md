@@ -369,6 +369,13 @@ node scripts/mcp-smoke.mjs voice_say '{"text":"hello"}' # drive an MCP tool dire
 
 ---
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set
+up your environment, run the tests, and open a pull request.
+
+---
+
 ## Notes & limits
 
 - The default **local** engine is free and runs offline — no per-turn cost. On
